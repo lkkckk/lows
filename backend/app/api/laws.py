@@ -24,7 +24,6 @@ def get_law_service(request: Request) -> LawService:
 async def create_law(
     law_in: LawCreate,
     service: LawService = Depends(get_law_service),
-    _admin: bool = Depends(verify_admin),
 ):
     """
     手动创建法规

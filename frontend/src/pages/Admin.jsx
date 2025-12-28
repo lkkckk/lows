@@ -1,10 +1,14 @@
 /**
- * 后台管理页面 - 法规管理
+ * 后台管理页面 - 模块化重构版
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { Settings, Trash2, Edit3, Eye, AlertTriangle, ChevronLeft, X, Save, Bell, ToggleLeft, ToggleRight, LogOut } from 'lucide-react';
+import {
+    Settings, Trash2, Edit3, Eye, AlertTriangle, ChevronLeft, X, Save,
+    Bell, ToggleLeft, ToggleRight, LogOut, LayoutDashboard, BookOpen,
+    PieChart, TrendingUp, FileText
+} from 'lucide-react';
 import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings } from '../services/api';
 import '../styles/Admin.css';
 
@@ -18,8 +22,241 @@ const STATUS_OPTIONS = [
 const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '程序规定'];
 const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
+// ==================== 仪表盘模块 ====================
+const DashboardModule = ({ laws }) => {
+    // 计算分类统计
+    const categoryStats = useMemo(() => {
+        const stats = {};
+        laws.forEach(law => {
+            const cat = law.category || '未分类';
+            stats[cat] = (stats[cat] || 0) + 1;
+        });
+        return Object.entries(stats).sort((a, b) => b[1] - a[1]);
+    }, [laws]);
+
+    // 计算层级统计
+    const levelStats = useMemo(() => {
+        const stats = {};
+        laws.forEach(law => {
+            const lvl = law.level || '未分类';
+            stats[lvl] = (stats[lvl] || 0) + 1;
+        });
+        return Object.entries(stats).sort((a, b) => b[1] - a[1]);
+    }, [laws]);
+
+    // 计算状态统计
+    const statusStats = useMemo(() => {
+        const stats = {};
+        laws.forEach(law => {
+            const st = law.status || '未知';
+            stats[st] = (stats[st] || 0) + 1;
+        });
+        return Object.entries(stats);
+    }, [laws]);
+
+    return (
+        <div className="dashboard-module">
+            {/* 概览卡片 */}
+            <div className="stats-cards">
+                <div className="stat-card primary">
+                    <div className="stat-icon"><BookOpen size={28} /></div>
+                    <div className="stat-info">
+                        <span className="stat-value">{laws.length}</span>
+                        <span className="stat-label">法规总数</span>
+                    </div>
+                </div>
+                <div className="stat-card success">
+                    <div className="stat-icon"><FileText size={28} /></div>
+                    <div className="stat-info">
+                        <span className="stat-value">{categoryStats.length}</span>
+                        <span className="stat-label">分类数量</span>
+                    </div>
+                </div>
+                <div className="stat-card warning">
+                    <div className="stat-icon"><TrendingUp size={28} /></div>
+                    <div className="stat-info">
+                        <span className="stat-value">--</span>
+                        <span className="stat-label">今日浏览</span>
+                    </div>
+                    <span className="stat-badge">即将上线</span>
+                </div>
+            </div>
+
+            {/* 分类与层级分布 */}
+            <div className="chart-row">
+                <div className="chart-card">
+                    <h4><PieChart size={18} /> 分类分布</h4>
+                    <div className="bar-chart">
+                        {categoryStats.map(([cat, count]) => (
+                            <div key={cat} className="bar-item">
+                                <span className="bar-label">{cat}</span>
+                                <div className="bar-track">
+                                    <div
+                                        className="bar-fill"
+                                        style={{ width: `${(count / laws.length) * 100}%` }}
+                                    />
+                                </div>
+                                <span className="bar-value">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="chart-card">
+                    <h4><PieChart size={18} /> 效力层级</h4>
+                    <div className="bar-chart">
+                        {levelStats.slice(0, 5).map(([lvl, count]) => (
+                            <div key={lvl} className="bar-item">
+                                <span className="bar-label">{lvl}</span>
+                                <div className="bar-track">
+                                    <div
+                                        className="bar-fill secondary"
+                                        style={{ width: `${(count / laws.length) * 100}%` }}
+                                    />
+                                </div>
+                                <span className="bar-value">{count}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* 状态统计 */}
+            <div className="status-summary">
+                <h4>效力状态统计</h4>
+                <div className="status-tags">
+                    {statusStats.map(([st, count]) => {
+                        const opt = STATUS_OPTIONS.find(o => o.value === st);
+                        return (
+                            <span
+                                key={st}
+                                className="status-tag"
+                                style={{ borderColor: opt?.color || '#6b7280', color: opt?.color || '#6b7280' }}
+                            >
+                                {st}: {count}
+                            </span>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== 法规管理模块 ====================
+const LawsModule = ({ laws, onEdit, onDelete, onView }) => {
+    const getStatusColor = (status) => {
+        const option = STATUS_OPTIONS.find(o => o.value === status);
+        return option ? option.color : '#6b7280';
+    };
+
+    return (
+        <div className="laws-module">
+            <table className="admin-table">
+                <thead>
+                    <tr>
+                        <th style={{ width: '30%' }}>法规名称</th>
+                        <th style={{ width: '10%' }}>制定机关</th>
+                        <th style={{ width: '10%' }}>分类</th>
+                        <th style={{ width: '10%' }}>层级</th>
+                        <th style={{ width: '10%' }}>状态</th>
+                        <th style={{ width: '10%' }}>实施日期</th>
+                        <th style={{ width: '10%' }}>失效日期</th>
+                        <th style={{ width: '10%' }}>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {laws.map((law) => (
+                        <tr key={law.law_id}>
+                            <td className="law-title-cell">
+                                <span className="law-title" onClick={() => onView(law.law_id)}>
+                                    {law.title}
+                                </span>
+                            </td>
+                            <td>{law.issue_org || '-'}</td>
+                            <td>{law.category}</td>
+                            <td>{law.level}</td>
+                            <td>
+                                <span
+                                    className="status-badge"
+                                    style={{ borderColor: getStatusColor(law.status), color: getStatusColor(law.status) }}
+                                >
+                                    {law.status}
+                                </span>
+                            </td>
+                            <td>{law.effect_date || law.issue_date || '-'}</td>
+                            <td>{law.expire_date || '-'}</td>
+                            <td className="actions-cell">
+                                <button className="action-btn view-btn" onClick={() => onView(law.law_id)} title="查看">
+                                    <Eye size={16} />
+                                </button>
+                                <button className="action-btn edit-btn" onClick={() => onEdit(law)} title="编辑">
+                                    <Edit3 size={16} />
+                                </button>
+                                <button className="action-btn delete-btn" onClick={() => onDelete(law)} title="删除">
+                                    <Trash2 size={16} />
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            {laws.length === 0 && (
+                <div className="empty-state">
+                    <p>暂无法规数据</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ==================== 系统设置模块 ====================
+const SettingsModule = ({ popupSettings, onChange, onSave, saving }) => (
+    <div className="settings-module">
+        <div className="settings-section">
+            <div className="section-header">
+                <Bell size={20} />
+                <h3>首页弹窗设置</h3>
+                <button
+                    className={`toggle-switch ${popupSettings.enabled ? 'active' : ''}`}
+                    onClick={() => onChange('enabled', !popupSettings.enabled)}
+                >
+                    {popupSettings.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                    <span>{popupSettings.enabled ? '已开启' : '已关闭'}</span>
+                </button>
+            </div>
+            <div className="section-body">
+                <div className="form-group">
+                    <label>弹窗标题</label>
+                    <input
+                        type="text"
+                        placeholder="请输入弹窗标题..."
+                        value={popupSettings.title}
+                        onChange={(e) => onChange('title', e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label>弹窗正文</label>
+                    <textarea
+                        placeholder="请输入弹窗内容..."
+                        value={popupSettings.content}
+                        onChange={(e) => onChange('content', e.target.value)}
+                        rows={4}
+                    />
+                </div>
+                <button className="btn-primary" onClick={onSave} disabled={saving}>
+                    <Save size={16} />
+                    {saving ? '保存中...' : '保存设置'}
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
+// ==================== 主组件 ====================
 export default function Admin() {
     const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState('dashboard');
     const [laws, setLaws] = useState([]);
     const [loading, setLoading] = useState(true);
     const [editingLaw, setEditingLaw] = useState(null);
@@ -27,7 +264,6 @@ export default function Admin() {
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [saving, setSaving] = useState(false);
 
-    // 首页弹窗配置
     const [popupSettings, setPopupSettings] = useState({
         enabled: false,
         title: '',
@@ -120,16 +356,17 @@ export default function Admin() {
         }
     };
 
-    const getStatusColor = (status) => {
-        const option = STATUS_OPTIONS.find(o => o.value === status);
-        return option ? option.color : '#6b7280';
-    };
-
     const handleLogout = () => {
         localStorage.removeItem('adminToken');
         message.success('已退出登录');
         navigate('/admin/login');
     };
+
+    const TABS = [
+        { id: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
+        { id: 'laws', label: '法规管理', icon: BookOpen },
+        { id: 'settings', label: '系统设置', icon: Settings },
+    ];
 
     if (loading) {
         return (
@@ -155,9 +392,6 @@ export default function Admin() {
                     </div>
                 </div>
                 <div className="admin-stats">
-                    <span className="stat-item">
-                        共 <strong>{laws.length}</strong> 部法规
-                    </span>
                     <button className="logout-button" onClick={handleLogout} title="退出登录">
                         <LogOut size={18} />
                         退出
@@ -165,114 +399,42 @@ export default function Admin() {
                 </div>
             </header>
 
-            {/* 首页弹窗配置 */}
-            <div className="popup-config-card">
-                <div className="popup-config-header">
-                    <Bell size={20} />
-                    <h3>首页弹窗设置</h3>
-                    <button
-                        className={`toggle-switch ${popupSettings.enabled ? 'active' : ''}`}
-                        onClick={() => handlePopupChange('enabled', !popupSettings.enabled)}
-                    >
-                        {popupSettings.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-                        <span>{popupSettings.enabled ? '已开启' : '已关闭'}</span>
-                    </button>
-                </div>
-                <div className="popup-config-body">
-                    <div className="form-group">
-                        <label>弹窗标题</label>
-                        <input
-                            type="text"
-                            placeholder="请输入弹窗标题..."
-                            value={popupSettings.title}
-                            onChange={(e) => handlePopupChange('title', e.target.value)}
-                        />
-                    </div>
-                    <div className="form-group">
-                        <label>弹窗正文</label>
-                        <textarea
-                            placeholder="请输入弹窗内容..."
-                            value={popupSettings.content}
-                            onChange={(e) => handlePopupChange('content', e.target.value)}
-                            rows={4}
-                        />
-                    </div>
-                    <button className="btn-primary" onClick={handleSavePopup} disabled={popupSaving}>
-                        <Save size={16} />
-                        {popupSaving ? '保存中...' : '保存设置'}
-                    </button>
-                </div>
-            </div>
+            {/* 主布局：侧边栏 + 内容 */}
+            <div className="admin-layout">
+                {/* 侧边栏 */}
+                <aside className="admin-sidebar">
+                    {TABS.map(tab => (
+                        <button
+                            key={tab.id}
+                            className={`sidebar-item ${activeTab === tab.id ? 'active' : ''}`}
+                            onClick={() => setActiveTab(tab.id)}
+                        >
+                            <tab.icon size={20} />
+                            <span>{tab.label}</span>
+                        </button>
+                    ))}
+                </aside>
 
-            {/* 法规列表 */}
-            <div className="admin-content">
-                <table className="admin-table">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '30%' }}>法规名称</th>
-                            <th style={{ width: '10%' }}>制定机关</th>
-                            <th style={{ width: '10%' }}>分类</th>
-                            <th style={{ width: '10%' }}>层级</th>
-                            <th style={{ width: '10%' }}>状态</th>
-                            <th style={{ width: '10%' }}>实施日期</th>
-                            <th style={{ width: '10%' }}>失效日期</th>
-                            <th style={{ width: '10%' }}>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {laws.map((law) => (
-                            <tr key={law.law_id}>
-                                <td className="law-title-cell">
-                                    <span className="law-title" onClick={() => navigate(`/laws/${law.law_id}`)}>
-                                        {law.title}
-                                    </span>
-                                </td>
-                                <td>{law.issue_org || '-'}</td>
-                                <td>{law.category}</td>
-                                <td>{law.level}</td>
-                                <td>
-                                    <span
-                                        className="status-badge"
-                                        style={{ borderColor: getStatusColor(law.status), color: getStatusColor(law.status) }}
-                                    >
-                                        {law.status}
-                                    </span>
-                                </td>
-                                <td>{law.effect_date || law.issue_date || '-'}</td>
-                                <td>{law.expire_date || '-'}</td>
-                                <td className="actions-cell">
-                                    <button
-                                        className="action-btn view-btn"
-                                        onClick={() => navigate(`/laws/${law.law_id}`)}
-                                        title="查看"
-                                    >
-                                        <Eye size={16} />
-                                    </button>
-                                    <button
-                                        className="action-btn edit-btn"
-                                        onClick={() => openEditModal(law)}
-                                        title="编辑"
-                                    >
-                                        <Edit3 size={16} />
-                                    </button>
-                                    <button
-                                        className="action-btn delete-btn"
-                                        onClick={() => setDeleteConfirm(law)}
-                                        title="删除"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                {laws.length === 0 && (
-                    <div className="empty-state">
-                        <p>暂无法规数据</p>
-                    </div>
-                )}
+                {/* 内容区 */}
+                <main className="admin-main">
+                    {activeTab === 'dashboard' && <DashboardModule laws={laws} />}
+                    {activeTab === 'laws' && (
+                        <LawsModule
+                            laws={laws}
+                            onEdit={openEditModal}
+                            onDelete={setDeleteConfirm}
+                            onView={(id) => navigate(`/laws/${id}`)}
+                        />
+                    )}
+                    {activeTab === 'settings' && (
+                        <SettingsModule
+                            popupSettings={popupSettings}
+                            onChange={handlePopupChange}
+                            onSave={handleSavePopup}
+                            saving={popupSaving}
+                        />
+                    )}
+                </main>
             </div>
 
             {/* 编辑弹窗 */}
@@ -287,7 +449,6 @@ export default function Admin() {
                         </div>
                         <div className="modal-body">
                             <div className="edit-law-title">{editingLaw.title}</div>
-
                             <div className="form-grid">
                                 <div className="form-group">
                                     <label>效力状态</label>
@@ -300,7 +461,6 @@ export default function Admin() {
                                         ))}
                                     </select>
                                 </div>
-
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                     <label>制定机关</label>
                                     <input
@@ -310,7 +470,6 @@ export default function Admin() {
                                         onChange={(e) => handleEditChange('issue_org', e.target.value)}
                                     />
                                 </div>
-
                                 <div className="form-group">
                                     <label>法规分类</label>
                                     <select
@@ -323,7 +482,6 @@ export default function Admin() {
                                         ))}
                                     </select>
                                 </div>
-
                                 <div className="form-group">
                                     <label>效力层级</label>
                                     <select
@@ -336,7 +494,6 @@ export default function Admin() {
                                         ))}
                                     </select>
                                 </div>
-
                                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                                     <label>实施日期</label>
                                     <input

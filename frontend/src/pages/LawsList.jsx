@@ -206,7 +206,7 @@ export default function LawsList() {
                             </button>
                             {/* 移除我的收藏 */}
                             <button className="tool-button" onClick={() => navigate('/laws/create')} style={{ marginTop: '0.5rem', background: '#e0f2fe', color: '#0369a1' }}>
-                                <Shield size={16} /> 录入新规
+                                <Shield size={16} /> 录入法规
                             </button>
                         </div>
                     </aside>
