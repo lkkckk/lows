@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # MongoDB 数据库
+  mongodb:
+    image: mongo:5.0
+    container_name: law_system_mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: law_system
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongodb/init-indexes.js:/docker-entrypoint-initdb.d/init-indexes.js:ro
+    networks:
+      - law_system_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: law_system_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      # 连回宿主机的 MongoDB (数据所在地)
+      MONGODB_URL: mongodb://host.docker.internal:27017
+      MONGODB_DB: law_system
+      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      LOG_LEVEL: info
+    # 暂时不需要依赖内部 mongodb，因为我们要用外部的
+    # depends_on:
+    #   mongodb:
+    #     condition: service_healthy
+    networks:
+      - law_system_network
+    volumes:
+      # 后端热重载：挂载源码目录
+      - ./backend:/app:rw
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # React 前端应用
+  frontend:
+    image: node:18-alpine
+    container_name: law_system_frontend
+    working_dir: /app
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - CHOKIDAR_USEPOLLING=true # 解决 Windows 下 Docker 文件监听失效问题
+      - VITE_API_URL=http://localhost:8080/api
+    volumes:
+      # 前端热重载：挂载源码目录
+      - ./frontend:/app:rw
+      - /app/node_modules # 保护容器内的依赖不被宿主机覆盖
+    command: sh -c "npm install --registry=https://registry.npmmirror.com && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
+    networks:
+      - law_system_network
+
+  # MongoDB Express (可选 - 数据库管理界面)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: law_system_mongo_express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongodb:27017
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    depends_on:
+      - mongodb
+    networks:
+      - law_system_network
+    profiles:
+      - debug # 仅在 debug profile 下启动
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  law_system_network:
+    driver: bridge

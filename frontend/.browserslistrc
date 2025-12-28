@@ -1,0 +1,15 @@
+# 支持的浏览器版本
+# 适用于警务系统内网环境
+
+# 桌面浏览器
+Chrome >= 60
+Firefox >= 60
+Safari >= 12
+Edge >= 79
+
+# 不支持 IE
+not IE 11
+not IE_Mob 11
+
+# 默认配置
+defaults
