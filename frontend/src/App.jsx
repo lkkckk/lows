@@ -6,6 +6,7 @@ import TemplatesList from './pages/TemplatesList';
 import TemplateEditor from './pages/TemplateEditor';
 import LawEditor from './pages/LawEditor';
 import Admin from './pages/Admin';
+import AdminLogin from './pages/AdminLogin';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 
@@ -78,6 +79,19 @@ const Footer = () => (
     </footer>
 );
 
+// 路由守卫组件
+const ProtectedRoute = ({ children }) => {
+    const isAuthed = !!localStorage.getItem('adminToken');
+    const location = useLocation();
+
+    if (!isAuthed) {
+        // 保存尝试访问的路径，登录后可跳转回来
+        return <Navigate to="/admin/login" state={{ from: location }} replace />;
+    }
+
+    return children;
+};
+
 // 主布局（带导航栏和页脚）
 const MainLayout = ({ children }) => (
     <>
@@ -91,8 +105,16 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* 管理页面 - 独立布局，不显示导航栏 */}
-                <Route path="/admin" element={<Admin />} />
+                {/* 管理页面 */}
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route
+                    path="/admin"
+                    element={
+                        <ProtectedRoute>
+                            <Admin />
+                        </ProtectedRoute>
+                    }
+                />
 
                 {/* 主站页面 - 带导航栏和页脚 */}
                 <Route path="/*" element={

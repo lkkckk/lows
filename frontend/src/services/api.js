@@ -12,11 +12,28 @@ const apiClient = axios.create({
     },
 });
 
+// 请求拦截器 - 注入管理凭证
+apiClient.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('adminToken');
+        if (token) {
+            config.headers['X-Admin-Token'] = token;
+        }
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
 // 响应拦截器 - 统一处理错误
 apiClient.interceptors.response.use(
     (response) => response.data,
     (error) => {
         console.error('API 请求错误:', error);
+        // 如果后端返回 401，说明密码不正确或过期，清除本地状态并可能需要跳转
+        if (error.response && error.response.status === 401) {
+            localStorage.removeItem('adminToken');
+            // 可以在这里派发跳转登录页的逻辑，或者让组件自行处理
+        }
         return Promise.reject(error);
     }
 );
@@ -176,4 +193,13 @@ export const getPopupSettings = () => {
  */
 export const updatePopupSettings = (data) => {
     return apiClient.put('/settings/popup', data);
+};
+
+// ==================== 简易鉴权相关 API ====================
+
+/**
+ * 管理员登录
+ */
+export const adminLogin = (password) => {
+    return apiClient.post('/auth/login', { password });
 };

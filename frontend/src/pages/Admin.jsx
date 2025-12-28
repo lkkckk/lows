@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { Settings, Trash2, Edit3, Eye, AlertTriangle, ChevronLeft, X, Save, Bell, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Settings, Trash2, Edit3, Eye, AlertTriangle, ChevronLeft, X, Save, Bell, ToggleLeft, ToggleRight, LogOut } from 'lucide-react';
 import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings } from '../services/api';
 import '../styles/Admin.css';
 
@@ -125,6 +125,12 @@ export default function Admin() {
         return option ? option.color : '#6b7280';
     };
 
+    const handleLogout = () => {
+        localStorage.removeItem('adminToken');
+        message.success('已退出登录');
+        navigate('/admin/login');
+    };
+
     if (loading) {
         return (
             <div className="admin-loading">
@@ -152,6 +158,10 @@ export default function Admin() {
                     <span className="stat-item">
                         共 <strong>{laws.length}</strong> 部法规
                     </span>
+                    <button className="logout-button" onClick={handleLogout} title="退出登录">
+                        <LogOut size={18} />
+                        退出
+                    </button>
                 </div>
             </header>
 

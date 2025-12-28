@@ -6,6 +6,7 @@ from fastapi.responses import Response
 from typing import Optional, Dict, Any
 from app.models import APIResponse, DocTemplate, DocInstance
 from app.services import TemplateService
+from .auth import verify_admin
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -68,6 +69,7 @@ async def get_template_detail(
 async def create_template(
     template: DocTemplate,
     service: TemplateService = Depends(get_template_service),
+    _admin: bool = Depends(verify_admin),
 ):
     """
     创建模板
@@ -85,6 +87,7 @@ async def update_template(
     template_id: str,
     template: DocTemplate,
     service: TemplateService = Depends(get_template_service),
+    _admin: bool = Depends(verify_admin),
 ):
     """
     更新模板
@@ -105,6 +108,7 @@ async def update_template(
 async def delete_template(
     template_id: str,
     service: TemplateService = Depends(get_template_service),
+    _admin: bool = Depends(verify_admin),
 ):
     """
     删除模板

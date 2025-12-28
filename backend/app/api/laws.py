@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from typing import Optional, List
 from app.models import APIResponse, SearchRequest, LawCreate
 from app.services import LawService
+from .auth import verify_admin
 
 router = APIRouter(prefix="/laws", tags=["laws"])
 
@@ -23,6 +24,7 @@ def get_law_service(request: Request) -> LawService:
 async def create_law(
     law_in: LawCreate,
     service: LawService = Depends(get_law_service),
+    _admin: bool = Depends(verify_admin),
 ):
     """
     手动创建法规
@@ -143,6 +145,7 @@ async def update_law(
     law_id: str,
     request: Request,
     service: LawService = Depends(get_law_service),
+    _admin: bool = Depends(verify_admin),
 ):
     """
     更新法规信息（状态、分类等）
@@ -163,6 +166,7 @@ async def update_law(
 async def delete_law(
     law_id: str,
     service: LawService = Depends(get_law_service),
+    _admin: bool = Depends(verify_admin),
 ):
     """
     删除法规及其所有条文

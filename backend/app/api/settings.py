@@ -1,10 +1,11 @@
 """
 系统设置 API - 包含首页弹窗等配置
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from app.db import get_database
+from .auth import verify_admin
 
 router = APIRouter(prefix="/settings", tags=["系统设置"])
 
@@ -31,7 +32,7 @@ async def get_popup_settings():
 
 
 @router.put("/popup")
-async def update_popup_settings(data: PopupSettings):
+async def update_popup_settings(data: PopupSettings, _admin: bool = Depends(verify_admin)):
     """更新首页弹窗设置"""
     db = get_database()
     await db.settings.update_one(

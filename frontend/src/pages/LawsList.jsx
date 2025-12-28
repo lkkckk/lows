@@ -172,7 +172,7 @@ export default function LawsList() {
                     </div>
                 </div>
             )}
-            {/* 搜索区 */}
+
             <section className="hero-section">
                 <div className="container">
                     <h2 className="hero-title">精准执法，有法可依</h2>
