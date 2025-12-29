@@ -117,6 +117,18 @@ async def get_levels(service: LawService = Depends(get_law_service)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/stats/today-views", response_model=APIResponse)
+async def get_today_views(service: LawService = Depends(get_law_service)):
+    """
+    获取今日浏览总数
+    """
+    try:
+        count = await service.get_today_views()
+        return APIResponse(success=True, data={"today_views": count})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 动态路径路由（{law_id}）====================
 
 @router.get("/{law_id}", response_model=APIResponse)
@@ -132,6 +144,9 @@ async def get_law_detail(
         if not law:
             raise HTTPException(status_code=404, detail="法规不存在")
 
+        # 记录浏览
+        await service.record_view(law_id)
+        
         return APIResponse(success=True, data=law)
     except HTTPException:
         raise

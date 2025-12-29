@@ -9,7 +9,7 @@ import {
     Bell, ToggleLeft, ToggleRight, LogOut, LayoutDashboard, BookOpen,
     PieChart, TrendingUp, FileText
 } from 'lucide-react';
-import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings } from '../services/api';
+import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews } from '../services/api';
 import '../styles/Admin.css';
 
 const STATUS_OPTIONS = [
@@ -23,7 +23,7 @@ const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程�
 const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
 // ==================== 仪表盘模块 ====================
-const DashboardModule = ({ laws }) => {
+const DashboardModule = ({ laws, todayViews }) => {
     // 计算分类统计
     const categoryStats = useMemo(() => {
         const stats = {};
@@ -75,10 +75,9 @@ const DashboardModule = ({ laws }) => {
                 <div className="stat-card warning">
                     <div className="stat-icon"><TrendingUp size={28} /></div>
                     <div className="stat-info">
-                        <span className="stat-value">--</span>
+                        <span className="stat-value">{todayViews}</span>
                         <span className="stat-label">今日浏览</span>
                     </div>
-                    <span className="stat-badge">即将上线</span>
                 </div>
             </div>
 
@@ -263,6 +262,7 @@ export default function Admin() {
     const [editForm, setEditForm] = useState({});
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [todayViews, setTodayViews] = useState(0);
 
     const [popupSettings, setPopupSettings] = useState({
         enabled: false,
@@ -274,6 +274,7 @@ export default function Admin() {
     useEffect(() => {
         fetchLaws();
         fetchPopupSettings();
+        fetchTodayViews();
     }, []);
 
     const fetchLaws = async () => {
@@ -294,6 +295,17 @@ export default function Admin() {
             setPopupSettings(response);
         } catch (error) {
             console.error('加载弹窗设置失败:', error);
+        }
+    };
+
+    const fetchTodayViews = async () => {
+        try {
+            const response = await getTodayViews();
+            if (response.success) {
+                setTodayViews(response.data?.today_views || 0);
+            }
+        } catch (error) {
+            console.error('加载今日浏览失败:', error);
         }
     };
 
@@ -417,7 +429,7 @@ export default function Admin() {
 
                 {/* 内容区 */}
                 <main className="admin-main">
-                    {activeTab === 'dashboard' && <DashboardModule laws={laws} />}
+                    {activeTab === 'dashboard' && <DashboardModule laws={laws} todayViews={todayViews} />}
                     {activeTab === 'laws' && (
                         <LawsModule
                             laws={laws}

@@ -16,6 +16,7 @@ class LawService:
         self.db = db
         self.laws_collection = db.laws
         self.articles_collection = db.law_articles
+        self.view_logs_collection = db.view_logs
 
     async def create_law(self, law_in: LawCreate) -> Dict[str, Any]:
         """创建法规（包含条文）"""
@@ -447,3 +448,23 @@ class LawService:
         """
         levels = await self.laws_collection.distinct("level")
         return sorted(levels)
+
+    async def record_view(self, law_id: str) -> bool:
+        """记录一次法规浏览"""
+        from datetime import datetime
+        doc = {
+            "law_id": law_id,
+            "viewed_at": datetime.utcnow()
+        }
+        await self.view_logs_collection.insert_one(doc)
+        return True
+
+    async def get_today_views(self) -> int:
+        """获取今日浏览总数"""
+        from datetime import datetime, timedelta
+        # 获取今天 UTC 0点
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        count = await self.view_logs_collection.count_documents({
+            "viewed_at": {"$gte": today}
+        })
+        return count

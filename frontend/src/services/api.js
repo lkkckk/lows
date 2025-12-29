@@ -97,6 +97,13 @@ export const getLawLevels = () => {
 };
 
 /**
+ * 获取今日浏览统计
+ */
+export const getTodayViews = () => {
+    return apiClient.get('/laws/stats/today-views');
+};
+
+/**
  * 更新法规信息（管理功能）
  */
 export const updateLaw = (lawId, data) => {
