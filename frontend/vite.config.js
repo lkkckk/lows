@@ -15,10 +15,10 @@ export default defineConfig({
         })
     ],
     server: {
-        port: 5173,
+        port: process.env.VITE_PORT || 6011,
         proxy: {
             '/api': {
-                target: 'http://backend:8000',
+                target: `http://${process.env.VITE_BACKEND_HOST || 'localhost'}:${process.env.VITE_BACKEND_PORT || 4008}`,
                 changeOrigin: true,
             }
         }

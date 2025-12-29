@@ -14,7 +14,7 @@
 ### 基础 URL
 
 ```
-开发环境: http://localhost:8000/api
+开发环境: http://localhost:4008/api
 生产环境: https://your-domain.com/api
 ```
 
@@ -423,17 +423,17 @@ a.click();
 
 推荐使用以下工具测试 API：
 
-1. **Swagger UI**（内置）: http://localhost:8000/docs
+1. **Swagger UI**（内置）: http://localhost:4008/docs
 2. **Postman**: 导入 OpenAPI 规范
 3. **cURL**: 命令行测试
 
 **cURL 示例**:
 ```bash
 # 获取法规列表
-curl "http://localhost:8000/api/laws/?page=1&page_size=20"
+curl "http://localhost:4008/api/laws/?page=1&page_size=20"
 
 # 全局搜索
-curl -X POST "http://localhost:8000/api/laws/search" \
+curl -X POST "http://localhost:4008/api/laws/search" \
   -H "Content-Type: application/json" \
   -d '{"query":"拘留","page":1,"page_size":20}'
 ```

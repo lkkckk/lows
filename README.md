@@ -114,11 +114,11 @@ docker-compose up -d backend
 ```powershell
 cd backend
 pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app.main:app --host 0.0.0.0 --port 4008 --reload
 ```
 
-后端服务地址：http://localhost:8000
-API 文档：http://localhost:8000/docs
+后端服务地址：http://localhost:4008
+API 文档：http://localhost:4008/docs
 
 ### 5. 启动前端应用
 
@@ -134,7 +134,7 @@ npm install
 npm run dev
 ```
 
-前端访问地址：http://localhost:5173
+前端访问地址：http://localhost:6011
 
 ## 📚 MongoDB 数据模型
 
@@ -283,11 +283,11 @@ MONGODB_URL=mongodb://localhost:27017
 MONGODB_DB=law_system
 
 # Backend
-BACKEND_PORT=8000
-CORS_ORIGINS=http://localhost:5173
+BACKEND_PORT=4008
+CORS_ORIGINS=http://localhost:6011
 
 # Frontend
-VITE_API_URL=http://localhost:8000/api
+VITE_API_URL=http://localhost:4008/api
 ```
 
 ## 🐛 常见问题

@@ -29,13 +29,13 @@ services:
     container_name: law_system_backend
     restart: unless-stopped
     ports:
-      - "8080:8000"
+      - "4008:4008"
     environment:
       # 连回宿主机的 MongoDB (数据所在地)
-      MONGODB_URL: mongodb://host.docker.internal:27017
-      MONGODB_DB: law_system
-      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
-      LOG_LEVEL: info
+      MONGODB_URL: ${MONGODB_URL:-mongodb://host.docker.internal:27017}
+      MONGODB_DB: ${MONGODB_DB:-law_system}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:6011}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     # 暂时不需要依赖内部 mongodb，因为我们要用外部的
     # depends_on:
     #   mongodb:
@@ -45,7 +45,7 @@ services:
     volumes:
       # 后端热重载：挂载源码目录
       - ./backend:/app:rw
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 4008 --reload
 
   # React 前端应用
   frontend:
@@ -54,10 +54,13 @@ services:
     working_dir: /app
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "6011:6011"
     environment:
-      - CHOKIDAR_USEPOLLING=true # 解决 Windows 下 Docker 文件监听失效问题
-      - VITE_API_URL=http://localhost:8080/api
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_PORT=6011
+      - VITE_BACKEND_HOST=backend
+      - VITE_BACKEND_PORT=4008
+      - VITE_API_URL=http://localhost:4008/api
     volumes:
       # 前端热重载：挂载源码目录
       - ./frontend:/app:rw

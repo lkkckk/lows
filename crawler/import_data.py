@@ -10,9 +10,11 @@ from pathlib import Path
 from pymongo import MongoClient
 from datetime import datetime
 
+import os
+
 # MongoDB 配置
-MONGODB_URL = "mongodb://localhost:27017"
-MONGODB_DB = "law_system"
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
+MONGODB_DB = os.getenv("MONGODB_DB", "law_system")
 
 # 数据文件路径
 OUTPUT_DIR = Path("output")

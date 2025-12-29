@@ -29,7 +29,7 @@ app = FastAPI(
 )
 
 # CORS 配置（允许前端跨域访问）
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:6011").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -62,9 +62,11 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 4008))
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=8000,
+        host=host,
+        port=port,
         reload=True,
     )
