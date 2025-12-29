@@ -165,7 +165,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., description="搜索关键字")
     law_id: Optional[str] = Field(None, description="限定法规ID（单法规内搜索）")
     page: int = Field(default=1, ge=1, description="页码")
-    page_size: int = Field(default=20, ge=1, le=100, description="每页大小")
+    page_size: int = Field(default=20, ge=1, le=500, description="每页大小")
 
 
 class SearchResultItem(BaseModel):

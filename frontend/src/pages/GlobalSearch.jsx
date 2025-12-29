@@ -64,7 +64,7 @@ export default function GlobalSearch() {
             const response = await searchGlobal({
                 query: value,
                 page: 1,
-                page_size: 100, // 后端限制最大100
+                page_size: 500, // 增加到500以覆盖更多结果
             });
             const data = response.data || [];
             setAllResults(data);
@@ -147,7 +147,8 @@ export default function GlobalSearch() {
                         <h1>全库全文检索</h1>
                     </div>
                     <p className="search-hero-subtitle">
-                        支持对所有已收录的法律法规进行全文检索，结果精确到具体条文
+                        支持对所有已收录的法律法规进行全文检索，结果精确到具体条文，需要注意，如已收录的库中没有相应关键字，则无法检索到，如“刑事拘留”等，因为没有任何条文会出现“刑事拘留”这个词组。<br />
+                        <br />
                     </p>
 
                     {/* 发光搜索框 */}

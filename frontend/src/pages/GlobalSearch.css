@@ -176,7 +176,7 @@
 
 /* 左侧法规筛选栏 */
 .law-filter-sidebar {
-    width: 320px;
+    width: 400px;
     flex-shrink: 0;
     background: #f8fafc;
     border-right: 1px solid #e2e8f0;
