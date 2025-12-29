@@ -106,7 +106,7 @@ function parseMetadata(content) {
         } else if (lines[0].includes('治安') || lines[0].includes('行政')) {
             metadata.category = '行政法律';
         } else if (lines[0].includes('程') && lines[0].includes('定')) {
-            metadata.category = '程序法规';
+            metadata.category = '程序规定';
         }
     }
 
@@ -264,7 +264,7 @@ export default function LawEditor() {
     const [submitting, setSubmitting] = useState(false);
 
     // 动态选项状态
-    const [categories, setCategories] = useState(['刑事法律', '行政法律', '程序法规', '民事法律', '经济法律', '司法解释', '其他']);
+    const [categories, setCategories] = useState(['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '其他']);
     const [levels, setLevels] = useState(['法律', '行政法规', '部门规章', '地方性法规', '司法解释', '宪法']);
 
     useEffect(() => {
@@ -417,7 +417,7 @@ export default function LawEditor() {
                                             <Option value="现行有效">现行有效</Option>
                                             <Option value="尚未生效">尚未生效</Option>
                                             <Option value="已修订">已修订</Option>
-                                            <Option value="已失效">已失效</Option>
+                                            <Option value="已失效">已废止</Option>
                                         </Select>
                                     </Form.Item>
                                 </Col>

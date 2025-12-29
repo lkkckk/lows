@@ -436,11 +436,10 @@ class LawService:
         return snippet
 
     async def get_categories(self) -> List[str]:
-        """
-        获取所有法规分类
-        """
+        """获取所有法规分类（只返回数据库中实际存在的分类）"""
         categories = await self.laws_collection.distinct("category")
-        return sorted(categories)
+        # 过滤空值并排序
+        return sorted([c for c in categories if c])
 
     async def get_levels(self) -> List[str]:
         """

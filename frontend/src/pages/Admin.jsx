@@ -14,12 +14,12 @@ import '../styles/Admin.css';
 
 const STATUS_OPTIONS = [
     { value: '现行有效', label: '现行有效', color: '#10b981' },
-    { value: '已失效', label: '已失效', color: '#ef4444' },
+    { value: '已废止', label: '已废止', color: '#ef4444' },
     { value: '尚未生效', label: '尚未生效', color: '#f59e0b' },
     { value: '已修订', label: '已修订', color: '#6b7280' },
 ];
 
-const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '程序规定'];
+const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '其他'];
 const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
 // ==================== 仪表盘模块 ====================
@@ -161,7 +161,7 @@ const LawsModule = ({ laws, onEdit, onDelete, onView }) => {
                         <th style={{ width: '10%' }}>层级</th>
                         <th style={{ width: '10%' }}>状态</th>
                         <th style={{ width: '10%' }}>实施日期</th>
-                        <th style={{ width: '10%' }}>失效日期</th>
+                        <th style={{ width: '10%' }}>公布日期</th>
                         <th style={{ width: '10%' }}>操作</th>
                     </tr>
                 </thead>
@@ -185,7 +185,7 @@ const LawsModule = ({ laws, onEdit, onDelete, onView }) => {
                                 </span>
                             </td>
                             <td>{law.effect_date || law.issue_date || '-'}</td>
-                            <td>{law.expire_date || '-'}</td>
+                            <td>{law.issue_date || '-'}</td>
                             <td className="actions-cell">
                                 <button className="action-btn view-btn" onClick={() => onView(law.law_id)} title="查看">
                                     <Eye size={16} />
@@ -494,7 +494,15 @@ export default function Admin() {
                                         ))}
                                     </select>
                                 </div>
-                                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                                <div className="form-group">
+                                    <label>公布日期</label>
+                                    <input
+                                        type="date"
+                                        value={editForm.issue_date}
+                                        onChange={(e) => handleEditChange('issue_date', e.target.value)}
+                                    />
+                                </div>
+                                <div className="form-group">
                                     <label>实施日期</label>
                                     <input
                                         type="date"
