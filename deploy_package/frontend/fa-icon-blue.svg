@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Zhi+Mang+Xing&amp;display=swap');
+    </style>
+  </defs>
+  <!-- font-family 增加了 STXingkai (华文行楷) 等本地字体作为备选 -->
+  <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-family="'Zhi Mang Xing', 'STXingkai', 'Huawen Xingkai', 'LiSu', 'KaiTi', '楷体', cursive" font-size="400" fill="#1890FF">法</text>
+</svg>

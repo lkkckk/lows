@@ -63,7 +63,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 64px;
+    height: 80px;
     padding: 0 2rem;
 }
 
@@ -83,21 +83,21 @@ body {
 }
 
 .logo-image {
-    width: 42px;
-    height: 42px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
 .navbar-title h1 {
-    font-size: 1.125rem;
+    font-size: 1.375rem;
     font-weight: 700;
     letter-spacing: 0.025em;
 }
 
 .navbar-subtitle {
-    font-size: 10px;
+    font-size: 11px;
     color: #94a3b8;
     letter-spacing: 0.1em;
 }

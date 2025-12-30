@@ -89,7 +89,8 @@ export default function LawDetail() {
                 handleSearch(targetKeyword);
                 setContentReady(true);
             } else {
-                // 没有目标条文时直接显示
+                // 没有目标条文时，先滚动到顶部再显示
+                window.scrollTo(0, 0);
                 setContentReady(true);
             }
         }

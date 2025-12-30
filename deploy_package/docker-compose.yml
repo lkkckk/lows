@@ -1,0 +1,52 @@
+version: '3.8'
+
+# 法律文库系统 - 独立部署配置
+# 使用独立的网络和卷名，不会影响其他项目
+
+services:
+  # MongoDB 数据库
+  mongodb:
+    image: mongo:5.0
+    container_name: law_system_mongodb
+    restart: unless-stopped
+    ports:
+      - "27019:27017"
+    environment:
+      MONGO_INITDB_DATABASE: law_system
+    volumes:
+      - law_system_db_data:/data/db
+    networks:
+      - law_system_network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 后端服务
+  backend:
+    image: law-query-system-backend
+    container_name: law_system_backend
+    restart: unless-stopped
+    ports:
+      - "4008:8000"
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB=law_system
+      - HOST=0.0.0.0
+      - PORT=4008
+      - CORS_ORIGINS=http://localhost:6011,http://127.0.0.1:6011
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - law_system_network
+
+networks:
+  law_system_network:
+    name: law_system_network
+    driver: bridge
+
+volumes:
+  law_system_db_data:
+    name: law_system_db_data

@@ -381,12 +381,14 @@ export default function LawEditor() {
         <div style={{ paddingBottom: '3rem' }}>
             <section className="hero-section" style={{ padding: '2rem 1rem 3rem', background: 'linear-gradient(to right, #0f172a, #334155)' }}>
                 <div className="container">
-                    <button className="category-button" style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => navigate('/laws')}>
-                        <ChevronLeft size={18} /> 返回列表
-                    </button>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <FileText size={40} color="#38bdf8" />
-                        <h2 className="hero-title" style={{ textAlign: 'left', margin: 0 }}>手动录入新法规</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <FileText size={40} color="#38bdf8" />
+                            <h2 className="hero-title" style={{ textAlign: 'left', margin: 0 }}>手动录入新法规</h2>
+                        </div>
+                        <button className="category-button" style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }} onClick={() => navigate('/laws')}>
+                            <ChevronLeft size={18} /> 返回列表
+                        </button>
                     </div>
                 </div>
             </section>

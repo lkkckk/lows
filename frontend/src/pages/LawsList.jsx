@@ -35,8 +35,8 @@ const LawCard = ({ law, onClick }) => (
                 {law.status === '已修订' && (
                     <span className="tag tag-revised">已修订</span>
                 )}
-                {law.status === '已失效' && (
-                    <span className="tag tag-expired">已失效</span>
+                {law.status === '已废止' && (
+                    <span className="tag tag-expired">已废止</span>
                 )}
             </div>
             {/* 移除收藏按钮 */}
@@ -213,9 +213,9 @@ export default function LawsList() {
 
                     {/* 列表区 */}
                     <main className="main-section">
-                        <header className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                            <h3 className="section-title">
-                                {activeCategory} <span className="section-count">({pagination.total})</span>
+                        <header className="section-header" style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: '16px', padding: '8px 0', marginBottom: '8px' }}>
+                            <h3 className="section-title" style={{ fontSize: '16px', margin: 0, color: '#1e293b', fontWeight: 600 }}>
+                                {activeCategory} <span className="section-count" style={{ color: '#1e293b' }}>({pagination.total})</span>
                             </h3>
                             {/* 标题搜索框 */}
                             <div style={{

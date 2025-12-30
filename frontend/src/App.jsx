@@ -39,7 +39,7 @@ const Navbar = () => {
                 <div className="navbar-logo">
                     <img src="/logo.png" alt="北流公安" className="logo-image" />
                     <div className="navbar-title">
-                        <h1>法律文库检索平台</h1>
+                        <h1>常用法律检索平台</h1>
                         <p className="navbar-subtitle">Legal Library Search Platform</p>
                     </div>
                 </div>
@@ -73,7 +73,7 @@ const Navbar = () => {
 const Footer = () => (
     <footer className="footer">
         <div className="container">
-            <p>&copy; 2025 北流市公安局 | 内网版本 V1.0</p>
+            <p>&copy; 2025 北流市公安局侦查中心 | 内网版本 V1.0</p>
             <p className="footer-disclaimer">本系统数据来源于公开渠道，仅供执法参考，请以正式文本为准</p>
         </div>
     </footer>
