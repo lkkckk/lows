@@ -1,4 +1,4 @@
-import { Shield, Book, Search as SearchIcon, FileText } from 'lucide-react';
+import { Book, Search as SearchIcon, FileText } from 'lucide-react';
 import LawsList from './pages/LawsList';
 import LawDetail from './pages/LawDetail';
 import GlobalSearch from './pages/GlobalSearch';

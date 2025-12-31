@@ -1,16 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { message } from 'antd';
 import { Search, Book, ChevronRight, Zap, Filter, Check, X } from 'lucide-react';
 import { searchGlobal } from '../services/api';
 import './GlobalSearch.css';
 
-// 高亮关键字
-const highlightKeyword = (text, keyword) => {
-    if (!keyword || !text) return text;
+// 高亮关键字 - 缓存正则提升性能
+const createHighlighter = (keyword) => {
+    if (!keyword) return null;
     try {
         const escapedKw = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`(${escapedKw})`, 'gi');
+        return new RegExp(`(${escapedKw})`, 'gi');
+    } catch {
+        return null;
+    }
+};
+
+const highlightKeyword = (text, regex) => {
+    if (!regex || !text) return text;
+    try {
         const parts = text.split(regex);
         return parts.map((part, i) =>
             regex.test(part) ? <mark key={i} className="search-highlight">{part}</mark> : part
@@ -40,6 +48,9 @@ export default function GlobalSearch() {
     // 法规筛选相关状态
     const [lawsList, setLawsList] = useState([]); // 包含关键字的法规列表
     const [selectedLaw, setSelectedLaw] = useState(null); // 当前选中的法规
+
+    // 缓存高亮正则表达式，避免每次渲染重复编译
+    const highlightRegex = useMemo(() => createHighlighter(searchQuery), [searchQuery]);
 
     useEffect(() => {
         const query = searchParams.get('q');
@@ -244,7 +255,7 @@ export default function GlobalSearch() {
                                             )}
                                         </div>
                                         <div className="result-card-content">
-                                            {highlightKeyword(result.content, searchQuery)}
+                                            {highlightKeyword(result.content, highlightRegex)}
                                         </div>
                                         <div className="result-card-footer">
                                             <span className="view-detail">

@@ -1,17 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import {
     Search,
-    Clock,
     ChevronRight,
     Shield,
     Filter,
-    Star,
     Zap,
     Book,
     X,
-    Bell
 } from 'lucide-react';
 import { getLawsList, getLawCategories, getPopupSettings } from '../services/api';
 
@@ -146,6 +143,13 @@ export default function LawsList() {
         }
     };
 
+    // 使用 useMemo 缓存过滤结果，避免重复计算
+    const filteredLaws = useMemo(() => {
+        if (!titleFilter) return laws;
+        const lowerFilter = titleFilter.toLowerCase();
+        return laws.filter(law => law.title.toLowerCase().includes(lowerFilter));
+    }, [laws, titleFilter]);
+
     const handleClosePopup = () => {
         setShowPopup(false);
         sessionStorage.setItem('popupDismissed', 'true');
@@ -204,8 +208,7 @@ export default function LawsList() {
                             <button className="tool-button" onClick={() => navigate('/search')}>
                                 <Zap size={16} color="#eab308" /> 法条速查
                             </button>
-                            {/* 移除我的收藏 */}
-                            <button className="tool-button" onClick={() => navigate('/laws/create')} style={{ marginTop: '0.5rem', background: '#e0f2fe', color: '#0369a1' }}>
+                            <button className="tool-button" onClick={() => navigate('/laws/create')} style={{ marginTop: '0.5rem' }}>
                                 <Shield size={16} /> 录入法规
                             </button>
                         </div>
@@ -222,23 +225,24 @@ export default function LawsList() {
                                 display: 'flex',
                                 alignItems: 'center',
                                 background: '#f1f5f9',
-                                borderRadius: '8px',
-                                padding: '6px 12px',
+                                borderRadius: '10px',
+                                padding: '8px 16px',
                                 border: '1px solid #e2e8f0',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                minWidth: '320px'
                             }}>
-                                <Search size={16} color="#94a3b8" />
+                                <Search size={18} color="#94a3b8" />
                                 <input
                                     type="text"
-                                    placeholder="搜索法规名称..."
+                                    placeholder="输入法规名称进行筛选..."
                                     value={titleFilter}
                                     onChange={(e) => setTitleFilter(e.target.value)}
                                     style={{
                                         border: 'none',
                                         background: 'transparent',
                                         outline: 'none',
-                                        marginLeft: '8px',
-                                        width: '160px',
+                                        marginLeft: '10px',
+                                        width: '260px',
                                         fontSize: '14px',
                                         color: '#334155'
                                     }}
@@ -263,14 +267,12 @@ export default function LawsList() {
 
                         {loading ? (
                             <div className="loading-spinner"><div className="spinner"></div></div>
-                        ) : laws.filter(law => !titleFilter || law.title.toLowerCase().includes(titleFilter.toLowerCase())).length > 0 ? (
+                        ) : filteredLaws.length > 0 ? (
                             <>
                                 <div className="card-grid">
-                                    {laws
-                                        .filter(law => !titleFilter || law.title.toLowerCase().includes(titleFilter.toLowerCase()))
-                                        .map(law => (
-                                            <LawCard key={law.law_id} law={law} onClick={(l) => navigate(`/laws/${l.law_id}`)} />
-                                        ))}
+                                    {filteredLaws.map(law => (
+                                        <LawCard key={law.law_id} law={law} onClick={(l) => navigate(`/laws/${l.law_id}`)} />
+                                    ))}
                                 </div>
                                 {pagination.total > pagination.pageSize && (
                                     <div className="pagination">
