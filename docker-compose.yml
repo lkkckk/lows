@@ -29,7 +29,7 @@ services:
     container_name: law_system_backend
     restart: unless-stopped
     ports:
-      - "4008:4008"
+      - "4008:8000"
     environment:
       # 连接容器内的 MongoDB
       MONGODB_URL: ${MONGODB_URL:-mongodb://mongodb:27017}
@@ -45,7 +45,7 @@ services:
     volumes:
       # 后端热重载：挂载源码目录
       - ./backend:/app:rw
-    command: uvicorn app.main:app --host 0.0.0.0 --port 4008 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # React 前端应用
   frontend:

@@ -271,6 +271,71 @@
     color: white;
 }
 
+/* 筛选区块间距 */
+.filter-section {
+    display: flex;
+    flex-direction: column;
+    max-height: 45%;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.filter-section:last-child {
+    border-bottom: none;
+    max-height: 55%;
+}
+
+/* 分类筛选列表样式 */
+.category-filter-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 1rem;
+}
+
+.category-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.category-filter-item:hover {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+.category-filter-item.active {
+    background: #eff6ff;
+    color: #3b82f6;
+    border-color: #3b82f6;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+
+.category-name {
+    white-space: nowrap;
+}
+
+.category-count {
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 1px 6px;
+    border-radius: 6px;
+    opacity: 0.7;
+}
+
+.category-filter-item.active .category-count {
+    background: rgba(59, 130, 246, 0.1);
+    opacity: 1;
+}
+
 /* 右侧搜索结果 */
 .search-results {
     flex: 1;
@@ -322,9 +387,26 @@
 
 .result-card-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
+    align-items: flex-start;
     margin-bottom: 0.75rem;
+}
+
+.result-card-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.category-tag {
+    font-size: 11px;
+    background: #f1f5f9;
+    color: #64748b;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
 }
 
 .result-card-header h4 {

@@ -210,3 +210,14 @@ export const updatePopupSettings = (data) => {
 export const adminLogin = (password) => {
     return apiClient.post('/auth/login', { password });
 };
+
+// ==================== AI 问法相关 API ====================
+
+/**
+ * 发送消息给 AI 法律助手
+ * @param {string} message - 用户消息
+ * @param {Array} history - 对话历史（可选）
+ */
+export const sendAiMessage = (message, history = null) => {
+    return apiClient.post('/ai/chat', { message, history });
+};

@@ -172,6 +172,7 @@ class SearchResultItem(BaseModel):
     """搜索结果项"""
     law_id: str
     law_title: str
+    law_category: Optional[str] = None
     article_num: Optional[int] = None
     article_display: Optional[str] = None
     content: str

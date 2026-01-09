@@ -203,6 +203,35 @@ function splitArticles(fullText) {
         }
     }
 
+    // ===== 新增：前言提取（司法解释特有） =====
+    // 检测 "为依法...解释如下：" 类型的前言段落
+    let preambleContent = null;
+    const preLines = preText.split('\n');
+    const preambleLines = [];
+    let inPreamble = false;
+
+    for (const line of preLines) {
+        const lineStrip = line.trim();
+        if (!lineStrip) continue;
+        if (isStructureLine(lineStrip)) continue;
+        // 检测前言开始
+        if (lineStrip.startsWith('为') || lineStrip.startsWith('根据')) {
+            inPreamble = true;
+        }
+        if (inPreamble) {
+            preambleLines.push(lineStrip);
+        }
+        // 检测前言结束
+        if (inPreamble && (lineStrip.endsWith('：') || lineStrip.endsWith(':'))) {
+            break;
+        }
+    }
+
+    if (preambleLines.length > 0) {
+        preambleContent = preambleLines.join('');
+    }
+
+
     // 遍历每一条
     for (let i = 0; i < matches.length; i++) {
         const current = matches[i];
@@ -251,6 +280,22 @@ function splitArticles(fullText) {
         for (const structLine of foundNextStructures) {
             updateStructure(structLine);
         }
+    }
+
+    // ===== 新增：将前言插入为第零条 =====
+    if (preambleContent) {
+        // 重新编号
+        for (const art of articles) {
+            art.article_num += 1;
+        }
+        // 插入前言
+        articles.unshift({
+            article_num: 0,
+            article_display: '前言',
+            content: preambleContent,
+            chapter: '',
+            section: ''
+        });
     }
 
     return articles;

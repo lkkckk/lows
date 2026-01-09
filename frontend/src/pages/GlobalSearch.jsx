@@ -5,6 +5,9 @@ import { Search, Book, ChevronRight, Zap, Filter, Check, X } from 'lucide-react'
 import { searchGlobal } from '../services/api';
 import './GlobalSearch.css';
 
+// sessionStorage key
+const STORAGE_KEY = 'global_search_state';
+
 // 高亮关键字 - 缓存正则提升性能
 const createHighlighter = (keyword) => {
     if (!keyword) return null;
@@ -28,37 +31,85 @@ const highlightKeyword = (text, regex) => {
     }
 };
 
+// 从 sessionStorage 加载状态
+const loadSearchState = () => {
+    try {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (e) {
+        console.warn('加载搜索状态失败:', e);
+    }
+    return null;
+};
+
+// 保存状态到 sessionStorage
+const saveSearchState = (state) => {
+    try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (e) {
+        console.warn('保存搜索状态失败:', e);
+    }
+};
+
 export default function GlobalSearch() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
+    // 尝试从 sessionStorage 恢复状态
+    const savedState = useMemo(() => loadSearchState(), []);
+    const urlQuery = searchParams.get('q') || '';
+
     const [loading, setLoading] = useState(false);
-    const [results, setResults] = useState([]);
-    const [allResults, setAllResults] = useState([]); // 保存所有结果用于筛选
-    const [pagination, setPagination] = useState({
+    const [results, setResults] = useState(savedState?.results || []);
+    const [allResults, setAllResults] = useState(savedState?.allResults || []); // 保存所有结果用于筛选
+    const [pagination, setPagination] = useState(savedState?.pagination || {
         current: 1,
         pageSize: 20,
         total: 0,
     });
-    const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
+    const [searchQuery, setSearchQuery] = useState(urlQuery || savedState?.searchQuery || '');
 
     // 引用结果列表容器，用于翻页回顶
     const resultsRef = useRef(null);
 
     // 法规筛选相关状态
-    const [lawsList, setLawsList] = useState([]); // 包含关键字的法规列表
-    const [selectedLaw, setSelectedLaw] = useState(null); // 当前选中的法规
+    const [lawsList, setLawsList] = useState(savedState?.lawsList || []); // 包含关键字的法规列表
+    const [selectedLaw, setSelectedLaw] = useState(savedState?.selectedLaw || null); // 当前选中的法规
+
+    // 分类筛选相关状态
+    const [categoryList, setCategoryList] = useState(savedState?.categoryList || []); // 分类列表
+    const [selectedCategory, setSelectedCategory] = useState(savedState?.selectedCategory || null); // 当前选中的分类
 
     // 缓存高亮正则表达式，避免每次渲染重复编译
     const highlightRegex = useMemo(() => createHighlighter(searchQuery), [searchQuery]);
 
+    // 保存状态到 sessionStorage
+    useEffect(() => {
+        if (allResults.length > 0 || searchQuery) {
+            saveSearchState({
+                results,
+                allResults,
+                pagination,
+                searchQuery,
+                lawsList,
+                selectedLaw,
+                categoryList,
+                selectedCategory
+            });
+        }
+    }, [results, allResults, pagination, searchQuery, lawsList, selectedLaw, categoryList, selectedCategory]);
+
     useEffect(() => {
         const query = searchParams.get('q');
-        if (query) {
+        // 只在 URL 参数变化时触发搜索（排除从缓存恢复的情况）
+        if (query && query !== savedState?.searchQuery) {
             setSearchQuery(query);
             handleSearch(query, 1);
         }
     }, [searchParams]);
+
 
     const handleSearch = async (value, page = 1) => {
         if (!value.trim()) {
@@ -71,6 +122,7 @@ export default function GlobalSearch() {
 
         setLoading(true);
         setSelectedLaw(null); // 重置法规筛选
+        setSelectedCategory(null); // 重置分类筛选
         try {
             const response = await searchGlobal({
                 query: value,
@@ -82,23 +134,39 @@ export default function GlobalSearch() {
 
             // 按法规分组，统计每部法规的匹配数量
             const lawsMap = new Map();
+            // 按分类分组
+            const categoryMap = new Map();
+
             data.forEach(item => {
+                // 法规统计
                 if (!lawsMap.has(item.law_id)) {
                     lawsMap.set(item.law_id, {
                         law_id: item.law_id,
                         law_title: item.law_title,
+                        law_category: item.law_category || '未分类',
                         count: 0
                     });
                 }
                 lawsMap.get(item.law_id).count++;
+
+                // 分类统计
+                const category = item.law_category || '未分类';
+                if (!categoryMap.has(category)) {
+                    categoryMap.set(category, { name: category, count: 0 });
+                }
+                categoryMap.get(category).count++;
             });
 
             // 转换为数组并按匹配数量排序
             const lawsArray = Array.from(lawsMap.values()).sort((a, b) => b.count - a.count);
             setLawsList(lawsArray);
 
+            // 分类排序（按数量降序）
+            const categoryArray = Array.from(categoryMap.values()).sort((a, b) => b.count - a.count);
+            setCategoryList(categoryArray);
+
             // 显示所有结果（分页）
-            updateDisplayResults(data, null, page);
+            updateDisplayResults(data, null, null, 1);
         } catch (error) {
             message.error('搜索失败');
         } finally {
@@ -107,10 +175,17 @@ export default function GlobalSearch() {
     };
 
     // 根据筛选条件更新显示的结果
-    const updateDisplayResults = (data, lawId, page) => {
+    const updateDisplayResults = (data, categoryName, lawId, page) => {
         let filtered = data;
+
+        // 先按分类筛选
+        if (categoryName) {
+            filtered = filtered.filter(item => (item.law_category || '未分类') === categoryName);
+        }
+
+        // 再按法规筛选
         if (lawId) {
-            filtered = data.filter(item => item.law_id === lawId);
+            filtered = filtered.filter(item => item.law_id === lawId);
         }
 
         const pageSize = 20;
@@ -128,6 +203,52 @@ export default function GlobalSearch() {
         if (resultsRef.current) {
             resultsRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
+
+        // 更新法规列表（根据分类筛选后的数据）
+        if (categoryName && !lawId) {
+            const lawsMap = new Map();
+            filtered.forEach(item => {
+                if (!lawsMap.has(item.law_id)) {
+                    lawsMap.set(item.law_id, {
+                        law_id: item.law_id,
+                        law_title: item.law_title,
+                        law_category: item.law_category || '未分类',
+                        count: 0
+                    });
+                }
+                lawsMap.get(item.law_id).count++;
+            });
+            const lawsArray = Array.from(lawsMap.values()).sort((a, b) => b.count - a.count);
+            setLawsList(lawsArray);
+        }
+    };
+
+    // 选择分类筛选
+    const handleCategoryFilter = (category) => {
+        if (selectedCategory?.name === category.name) {
+            // 取消筛选
+            setSelectedCategory(null);
+            setSelectedLaw(null);
+            // 重新计算法规列表
+            const lawsMap = new Map();
+            allResults.forEach(item => {
+                if (!lawsMap.has(item.law_id)) {
+                    lawsMap.set(item.law_id, {
+                        law_id: item.law_id,
+                        law_title: item.law_title,
+                        law_category: item.law_category || '未分类',
+                        count: 0
+                    });
+                }
+                lawsMap.get(item.law_id).count++;
+            });
+            setLawsList(Array.from(lawsMap.values()).sort((a, b) => b.count - a.count));
+            updateDisplayResults(allResults, null, null, 1);
+        } else {
+            setSelectedCategory(category);
+            setSelectedLaw(null); // 切换分类时清除法规筛选
+            updateDisplayResults(allResults, category.name, null, 1);
+        }
     };
 
     // 选择法规筛选
@@ -135,17 +256,32 @@ export default function GlobalSearch() {
         if (selectedLaw?.law_id === law.law_id) {
             // 取消筛选
             setSelectedLaw(null);
-            updateDisplayResults(allResults, null, 1);
+            updateDisplayResults(allResults, selectedCategory?.name, null, 1);
         } else {
             setSelectedLaw(law);
-            updateDisplayResults(allResults, law.law_id, 1);
+            updateDisplayResults(allResults, selectedCategory?.name, law.law_id, 1);
         }
     };
 
-    // 清除筛选
+    // 清除所有筛选
     const clearFilter = () => {
         setSelectedLaw(null);
-        updateDisplayResults(allResults, null, 1);
+        setSelectedCategory(null);
+        // 重新计算法规列表
+        const lawsMap = new Map();
+        allResults.forEach(item => {
+            if (!lawsMap.has(item.law_id)) {
+                lawsMap.set(item.law_id, {
+                    law_id: item.law_id,
+                    law_title: item.law_title,
+                    law_category: item.law_category || '未分类',
+                    count: 0
+                });
+            }
+            lawsMap.get(item.law_id).count++;
+        });
+        setLawsList(Array.from(lawsMap.values()).sort((a, b) => b.count - a.count));
+        updateDisplayResults(allResults, null, null, 1);
     };
 
     return (
@@ -203,33 +339,7 @@ export default function GlobalSearch() {
                     <div className="loading-spinner"><div className="spinner"></div></div>
                 ) : allResults.length > 0 ? (
                     <div className="search-layout">
-                        {/* 左侧：法规筛选列表 */}
-                        <aside className="law-filter-sidebar">
-                            <div className="filter-header">
-                                <Filter size={18} />
-                                <span>按法规筛选</span>
-                                {selectedLaw && (
-                                    <button className="clear-filter-btn" onClick={clearFilter}>
-                                        <X size={14} /> 清除
-                                    </button>
-                                )}
-                            </div>
-                            <div className="filter-list">
-                                {lawsList.map(law => (
-                                    <button
-                                        key={law.law_id}
-                                        className={`filter-item ${selectedLaw?.law_id === law.law_id ? 'active' : ''}`}
-                                        onClick={() => handleLawFilter(law)}
-                                    >
-                                        <span className="filter-item-title">{law.law_title}</span>
-                                        <span className="filter-item-count">{law.count}</span>
-                                        {selectedLaw?.law_id === law.law_id && <Check size={14} className="filter-check" />}
-                                    </button>
-                                ))}
-                            </div>
-                        </aside>
-
-                        {/* 右侧：搜索结果 */}
+                        {/* 左侧：搜索结果 */}
                         <main className="search-results" ref={resultsRef}>
                             <header className="results-header">
                                 <h3>
@@ -249,7 +359,12 @@ export default function GlobalSearch() {
                                         onClick={() => navigate(`/laws/${result.law_id}?article=${result.article_num}&kw=${searchQuery}`)}
                                     >
                                         <div className="result-card-header">
-                                            <h4>{result.law_title}</h4>
+                                            <div className="result-card-title-group">
+                                                <h4>{result.law_title}</h4>
+                                                {result.law_category && (
+                                                    <span className="category-tag">{result.law_category}</span>
+                                                )}
+                                            </div>
                                             {result.article_display && (
                                                 <span className="result-article-tag">{result.article_display}</span>
                                             )}
@@ -271,7 +386,7 @@ export default function GlobalSearch() {
                                     <button
                                         className="pagination-button"
                                         disabled={pagination.current === 1}
-                                        onClick={() => updateDisplayResults(allResults, selectedLaw?.law_id, pagination.current - 1)}
+                                        onClick={() => updateDisplayResults(allResults, selectedCategory?.name, selectedLaw?.law_id, pagination.current - 1)}
                                     >
                                         上一页
                                     </button>
@@ -281,13 +396,62 @@ export default function GlobalSearch() {
                                     <button
                                         className="pagination-button"
                                         disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
-                                        onClick={() => updateDisplayResults(allResults, selectedLaw?.law_id, pagination.current + 1)}
+                                        onClick={() => updateDisplayResults(allResults, selectedCategory?.name, selectedLaw?.law_id, pagination.current + 1)}
                                     >
                                         下一页
                                     </button>
                                 </div>
                             )}
                         </main>
+
+                        {/* 右侧：筛选列表 */}
+                        <aside className="law-filter-sidebar">
+                            {/* 分类筛选 */}
+                            <div className="filter-section">
+                                <div className="filter-header">
+                                    <Filter size={18} />
+                                    <span>按分类筛选</span>
+                                    {(selectedCategory || selectedLaw) && (
+                                        <button className="clear-filter-btn" onClick={clearFilter}>
+                                            <X size={14} /> 清除
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="category-filter-list">
+                                    {categoryList.map(cat => (
+                                        <button
+                                            key={cat.name}
+                                            className={`category-filter-item ${selectedCategory?.name === cat.name ? 'active' : ''}`}
+                                            onClick={() => handleCategoryFilter(cat)}
+                                        >
+                                            <span className="category-name">{cat.name}</span>
+                                            <span className="category-count">{cat.count}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 法规筛选 */}
+                            <div className="filter-section">
+                                <div className="filter-header">
+                                    <Book size={18} />
+                                    <span>按法规筛选</span>
+                                </div>
+                                <div className="filter-list">
+                                    {lawsList.map(law => (
+                                        <button
+                                            key={law.law_id}
+                                            className={`filter-item ${selectedLaw?.law_id === law.law_id ? 'active' : ''}`}
+                                            onClick={() => handleLawFilter(law)}
+                                        >
+                                            <span className="filter-item-title">{law.law_title}</span>
+                                            <span className="filter-item-count">{law.count}</span>
+                                            {selectedLaw?.law_id === law.law_id && <Check size={14} className="filter-check" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </aside>
                     </div>
                 ) : searchQuery ? (
                     <div className="empty-state">

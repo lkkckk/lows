@@ -10,6 +10,32 @@ import re
 import math
 
 
+# 法律权重配置（权重越大排序越靠前）
+LAW_WEIGHT_CONFIG = {
+    "治安管理处罚法": 100,
+    "中华人民共和国治安管理处罚法": 100,
+    "刑法": 95,
+    "中华人民共和国刑法": 95,
+    "刑事诉讼法": 90,
+    "中华人民共和国刑事诉讼法": 90,
+    "公安机关办理行政案件程序规定": 85,
+    "公安机关办理刑事案件程序规定": 80,
+}
+DEFAULT_WEIGHT = 50
+
+
+def get_law_weight(title: str) -> int:
+    """根据法律标题获取权重"""
+    # 精确匹配
+    if title in LAW_WEIGHT_CONFIG:
+        return LAW_WEIGHT_CONFIG[title]
+    # 模糊匹配（包含关键词）
+    for key, weight in LAW_WEIGHT_CONFIG.items():
+        if key in title:
+            return weight
+    return DEFAULT_WEIGHT
+
+
 class LawService:
     """法规服务类"""
 
@@ -67,6 +93,7 @@ class LawService:
         level: Optional[str] = None,
         status: Optional[str] = None,
         tags: Optional[List[str]] = None,
+        title: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         获取法规列表（分页 + 筛选）
@@ -81,6 +108,8 @@ class LawService:
             query["status"] = status
         if tags:
             query["tags"] = {"$in": tags}
+        if title:
+            query["title"] = {"$regex": title, "$options": "i"}
 
         # 计算总数
         total = await self.laws_collection.count_documents(query)
@@ -361,8 +390,7 @@ class LawService:
         注意：MongoDB 文本索引对中文支持不完善，会漏掉大量结果。
         为确保搜索准确性（100%不漏），直接使用正则表达式搜索。
         
-        性能优化依赖于 content 字段的普通索引（如有），
-        以及 MongoDB 的查询优化器。
+        排序策略：按法律权重降序 + 条号升序
         """
         import time
         start_time = time.time()
@@ -371,27 +399,16 @@ class LawService:
         search_query = {"content": {"$regex": query, "$options": "i"}}
         total = await self.articles_collection.count_documents(search_query)
         
-        skip = (page - 1) * page_size
-        total_pages = math.ceil(total / page_size) if total > 0 else 0
-        
+        # 获取所有匹配结果（用于权重排序）
+        # 注意：对于大量数据，这种方式可能比较慢，但能保证排序准确
         pipeline = [
             {"$match": search_query},
-            {"$sort": {"law_id": 1, "article_num": 1}},
-            {"$skip": skip},
-            {"$limit": page_size},
             {
                 "$lookup": {
                     "from": "laws",
                     "localField": "law_id",
                     "foreignField": "law_id",
                     "as": "law_info",
-                    "pipeline": [
-                        {"$project": {
-                            "title": 1,
-                            "law_id": 1,
-                            "_id": 0
-                        }}
-                    ]
                 }
             },
             {"$unwind": "$law_info"},
@@ -400,6 +417,7 @@ class LawService:
                     "_id": 1,
                     "law_id": 1,
                     "law_title": "$law_info.title",
+                    "law_category": "$law_info.category",
                     "article_num": 1,
                     "article_display": 1,
                     "content": 1,
@@ -407,9 +425,17 @@ class LawService:
             }
         ]
 
-        results = await self.articles_collection.aggregate(pipeline).to_list(length=page_size)
+        results = await self.articles_collection.aggregate(pipeline).to_list(length=None)
+        
+        # 按权重排序（权重降序，同权重按条号升序）
+        results.sort(key=lambda x: (-get_law_weight(x.get("law_title", "")), x.get("article_num", 0)))
+        
+        # 分页
+        total_pages = math.ceil(total / page_size) if total > 0 else 0
+        skip = (page - 1) * page_size
+        paged_results = results[skip:skip + page_size]
 
-        for result in results:
+        for result in paged_results:
             result["_id"] = str(result["_id"])
             result["highlight"] = self._generate_highlight(result["content"], query)
 
@@ -417,7 +443,7 @@ class LawService:
         print(f"🔍 搜索完成: query=\"{query}\" | results={total} | time={elapsed_time:.3f}s")
 
         return {
-            "data": results,
+            "data": paged_results,
             "pagination": {
                 "total": total,
                 "page": page,

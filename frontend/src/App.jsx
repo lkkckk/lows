@@ -1,4 +1,4 @@
-import { Book, Search as SearchIcon, FileText } from 'lucide-react';
+import { Book, Search as SearchIcon, FileText, Sparkles } from 'lucide-react';
 import LawsList from './pages/LawsList';
 import LawDetail from './pages/LawDetail';
 import GlobalSearch from './pages/GlobalSearch';
@@ -7,6 +7,7 @@ import TemplateEditor from './pages/TemplateEditor';
 import LawEditor from './pages/LawEditor';
 import Admin from './pages/Admin';
 import AdminLogin from './pages/AdminLogin';
+import AiConsult from './pages/AiConsult';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 
@@ -18,6 +19,7 @@ const Navbar = () => {
     const getActiveTab = () => {
         if (location.pathname.startsWith('/search')) return 'search';
         if (location.pathname.startsWith('/templates')) return 'templates';
+        if (location.pathname.startsWith('/ai')) return 'ai';
         return 'laws';
     };
 
@@ -27,7 +29,8 @@ const Navbar = () => {
         const routes = {
             'laws': '/laws',
             'search': '/search',
-            'templates': '/templates'
+            'templates': '/templates',
+            'ai': '/ai'
         };
         navigate(routes[tab]);
     };
@@ -50,6 +53,7 @@ const Navbar = () => {
                         { id: 'laws', label: '法规库', icon: Book },
                         { id: 'search', label: '全文检索', icon: SearchIcon },
                         { id: 'templates', label: '文书模板', icon: FileText },
+                        { id: 'ai', label: 'AI问法', icon: Sparkles },
                     ].map((item) => (
                         <button
                             key={item.id}
@@ -127,6 +131,7 @@ function App() {
                             <Route path="search" element={<GlobalSearch />} />
                             <Route path="templates" element={<TemplatesList />} />
                             <Route path="templates/:templateId" element={<TemplateEditor />} />
+                            <Route path="ai" element={<AiConsult />} />
                         </Routes>
                     </MainLayout>
                 } />

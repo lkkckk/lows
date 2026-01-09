@@ -36,6 +36,10 @@ dist-ssr/
 # 数据文件
 crawler/output/*.jsonl
 crawler/*_seen_urls.txt
+crawler/manual_data/
+
+# 部署包大文件
+deploy_package/*.tar
 
 # Docker
 *.log

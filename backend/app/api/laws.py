@@ -43,6 +43,7 @@ async def get_laws_list(
     level: Optional[str] = Query(None, description="效力层级"),
     status: Optional[str] = Query(None, description="效力状态"),
     tags: Optional[str] = Query(None, description="标签（逗号分隔）"),
+    title: Optional[str] = Query(None, description="法规标题搜索"),
     service: LawService = Depends(get_law_service),
 ):
     """
@@ -58,6 +59,7 @@ async def get_laws_list(
             level=level,
             status=status,
             tags=tags_list,
+            title=title,
         )
 
         return APIResponse(

@@ -23,9 +23,18 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'backend', 
 class LocalImporter:
     def __init__(self, input_dir="manual_data"):
         self.input_dir = input_dir
-        self.mongo_uri = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-        self.client = MongoClient(self.mongo_uri)
-        self.db = self.client[os.getenv("MONGODB_DB", "law_system")]  # 确保数据库名与后端一致
+        # 优先使用环境变量，否则使用 Docker 映射的端口
+        self.mongo_uri = os.getenv("MONGODB_URL", "mongodb://localhost:27019")
+        logging.info(f"🔗 连接 MongoDB: {self.mongo_uri}")
+        self.client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=5000)
+        self.db = self.client[os.getenv("MONGODB_DB", "law_system")]
+        # 测试连接
+        try:
+            self.client.admin.command('ping')
+            logging.info(f"✅ MongoDB 连接成功")
+        except Exception as e:
+            logging.error(f"❌ MongoDB 连接失败: {e}")
+            raise
         self.setup_indexes()
 
     def setup_indexes(self):
@@ -53,13 +62,129 @@ class LocalImporter:
             "issue_date": "",
             "effect_date": "",
             "issue_org": "",  # 先留空，稍后兜底
-            "status": "有效",
+            "status": "现行有效",
             "category": "",
             "level": "",  # 先留空，稍后兜底
             "summary": ""
         }
         
+        # ===== 新增：排除公告页干扰 =====
+        # 如果内容开头包含"公告"字样，跳过到正式标题
         lines = [line.strip() for line in content.split('\n') if line.strip()]
+        
+        # 查找并跳过公告部分
+        skip_until = 0
+        for i, line in enumerate(lines[:30]):  # 只检查前30行
+            # 匹配"公告"或"公  告"或"公    告"等（任意空格）
+            if re.match(r'^公\s*告$', line):
+                # 找到公告，继续向下找到日期行（如"2013年4月2日"或"2012 年 12 月 12 日"）作为公布日期
+                for j in range(i + 1, min(i + 15, len(lines))):
+                    # 支持带空格和不带空格的日期格式
+                    date_match = re.match(r'^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日$', lines[j])
+                    if date_match:
+                        # 提取公告落款日期作为公布日期
+                        year, month, day = date_match.groups()
+                        metadata["issue_date"] = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                        logging.info(f"   📅 从公告提取公布日期: {metadata['issue_date']}")
+                        skip_until = j + 1
+                        break
+                break
+        
+        if skip_until > 0:
+            lines = lines[skip_until:]
+            logging.info(f"   📋 已跳过公告部分 ({skip_until} 行)")
+        
+        # ===== 新增：智能合并多行标题 =====
+        # 司法解释的标题可能分成多行，需要合并
+        # 合并规则：从第一行开始，直到遇到"法释"/"法发"或括号开头的行
+        title_lines = []
+        for i, line in enumerate(lines[:15]):
+            # 跳过条件：机关名称行、公告行、日期行
+            if '公告' in line or '公  告' in line:
+                continue
+            if line.startswith('中华人民共和国'):
+                continue
+            if re.match(r'^\d{4}年\d{1,2}月\d{1,2}日$', line):
+                continue
+            # 停止条件：遇到法释/法发编号行，或者括号开头的修订说明
+            if re.match(r'^法[释发][\[〔【（(]', line) or \
+               line.startswith('(') or line.startswith('（'):
+                break
+            # 只保留包含"解释"/"规定"/"意见"等关键词的行，或"关于"开头的行
+            if '解释' in line or '规定' in line or '意见' in line or \
+               '关于' in line or '若干问题' in line:
+                # 如果这行包含"已于"/"已经"，说明进入了会议通过信息，截断
+                if '已于' in line or '已经' in line:
+                    # 只取"已于"之前的部分
+                    idx = line.find('已于')
+                    if idx == -1:
+                        idx = line.find('已经')
+                    if idx > 0:
+                        title_lines.append(line[:idx])
+                    break
+                title_lines.append(line)
+        
+        if title_lines:
+            # 合并标题并清理格式
+            merged_title = ''.join(title_lines)
+            # 将多个空格替换为中文顿号
+            merged_title = re.sub(r'\s{2,}', '、', merged_title)
+            # 移除《》符号
+            merged_title = merged_title.replace('《', '').replace('》', '')
+            
+            # 如果标题以"关于"开头，检查是否需要添加发布机关前缀
+            if merged_title.startswith('关于'):
+                # 从前面的行中查找发布机关
+                issuer_prefix = ""
+                for prev_line in lines[:10]:
+                    if '最高人民法院' in prev_line and '最高人民检察院' in prev_line:
+                        issuer_prefix = "最高人民法院、最高人民检察院"
+                        break
+                    elif '最高人民法院' in prev_line:
+                        issuer_prefix = "最高人民法院"
+                    elif '最高人民检察院' in prev_line:
+                        issuer_prefix = "最高人民检察院"
+                if issuer_prefix:
+                    merged_title = issuer_prefix + merged_title
+            
+            # 存储合并后的标题
+            metadata["merged_title"] = merged_title
+            logging.info(f"   📋 合并标题: {merged_title}")
+
+        
+        # ===== 司法解释识别 =====
+        full_text = '\n'.join(lines)
+        is_judicial_interpretation = False
+        
+        # 特征1：标题或内容包含"解释"
+        # 特征2：发布机关包含"最高人民法院"或"最高人民检察院"
+        for line in lines[:10]:
+            if '解释' in line or '最高人民法院' in line or '最高人民检察院' in line:
+                is_judicial_interpretation = True
+                break
+        
+        if is_judicial_interpretation:
+            metadata["level"] = "司法解释"
+            metadata["category"] = "司法解释"
+            # 智能识别发布机关
+            has_fayuan = '最高人民法院' in full_text[:500]
+            has_jianchayuan = '最高人民检察院' in full_text[:500]
+            if has_fayuan and has_jianchayuan:
+                metadata["issue_org"] = "最高人民法院、最高人民检察院"
+            elif has_fayuan:
+                metadata["issue_org"] = "最高人民法院"
+            elif has_jianchayuan:
+                metadata["issue_org"] = "最高人民检察院"
+            logging.info(f"   ⚖️ 识别为司法解释，发布机关: {metadata['issue_org']}")
+        
+        # ===== 新增：从正文提取实施日期 =====
+        # 匹配 "自XXXX年X月X日起施行" 或 "自XXXX年X月X日起实施"
+        effect_date_pattern = re.compile(r'自(\d{4})年(\d{1,2})月(\d{1,2})日起(?:施行|实施)')
+        match = effect_date_pattern.search(full_text)
+        if match:
+            year, month, day = match.groups()
+            metadata["effect_date"] = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+            logging.info(f"   📅 从正文提取实施日期: {metadata['effect_date']}")
         
         # 1. 尝试提取修订说明（圆括号包裹的长段落）
         # 通常在标题（第一行）之后，正文之前
@@ -76,19 +201,19 @@ class LocalImporter:
         for line in header_lines:
             if "发布日期" in line or "公布日期" in line:
                 metadata["issue_date"] = self._extract_value(line)
-            if "实施日期" in line or "施行日期" in line:
+            if ("实施日期" in line or "施行日期" in line) and not metadata["effect_date"]:
                 metadata["effect_date"] = self._extract_value(line)
             if "发布部门" in line or "发文机关" in line:
-                metadata["issue_org"] = self._extract_value(line)
+                if not metadata["issue_org"]:  # 不覆盖已识别的司法解释机关
+                    metadata["issue_org"] = self._extract_value(line)
             if "效力" in line and ("级别" in line or "等级" in line):
-                metadata["level"] = self._extract_value(line)
+                if not metadata["level"]:  # 不覆盖已识别的司法解释
+                    metadata["level"] = self._extract_value(line)
             if "类别" in line:
-                metadata["category"] = self._extract_value(line)
+                if not metadata["category"]:
+                    metadata["category"] = self._extract_value(line)
         
         # 3. 从末尾解析结构化元数据（Word 文档常见格式）
-        # 格式如：法规标题：xxx	法规文号：xxx
-        #        发布日期：xxx	实施日期：xxx
-        #        发布部门：xxx
         tail_lines = lines[-30:] if len(lines) > 30 else lines
         for line in tail_lines:
             # 排除无关内容
@@ -97,8 +222,7 @@ class LocalImporter:
             if "扫码" in line or "查法规" in line:
                 continue
             
-            # 解析键值对（支持制表符分隔的多个键值对）
-            # 例如：发布日期：2020年07月20日	实施日期：2020年09月01日
+            # 解析键值对
             pairs = re.split(r'\t+', line)
             for pair in pairs:
                 pair = pair.strip()
@@ -113,17 +237,17 @@ class LocalImporter:
                     val = self._extract_value(pair)
                     if val and not metadata["issue_date"]:
                         metadata["issue_date"] = val
-                elif "实施日期" in pair or "施行日期" in pair:
+                elif ("实施日期" in pair or "施行日期" in pair) and not metadata["effect_date"]:
                     val = self._extract_value(pair)
-                    if val and not metadata["effect_date"]:
+                    if val:
                         metadata["effect_date"] = val
-                elif "发布部门" in pair or "发文机关" in pair:
+                elif ("发布部门" in pair or "发文机关" in pair) and not metadata["issue_org"]:
                     val = self._extract_value(pair)
-                    if val and not metadata["issue_org"]:
+                    if val:
                         metadata["issue_org"] = val
-                elif "效力层级" in pair or "效力级别" in pair:
+                elif ("效力层级" in pair or "效力级别" in pair) and not metadata["level"]:
                     val = self._extract_value(pair)
-                    if val and not metadata["level"]:
+                    if val:
                         metadata["level"] = val
 
         # 4. 智能分类兜底
@@ -140,14 +264,12 @@ class LocalImporter:
         
         # 5. 字段默认值兜底
         if not metadata["issue_org"]:
-            # 根据标题智能判断发布机关
             if "公安" in title_for_category and "规定" in title_for_category:
                 metadata["issue_org"] = "公安部"
             else:
                 metadata["issue_org"] = "全国人民代表大会及其常务委员会"
         
         if not metadata["level"]:
-            # 根据标题智能判断效力层级
             if "规定" in title_for_category or "办法" in title_for_category:
                 metadata["level"] = "部门规章"
             else:
@@ -263,6 +385,36 @@ class LocalImporter:
             line_strip = line.strip()
             if is_structure_line(line_strip):
                 update_structure(line_strip)
+        
+        # ===== 新增：前言提取（司法解释特有） =====
+        # 检测 "为依法...解释如下：" 或 "...规定如下：" 类型的前言段落
+        preamble_content = None
+        
+        # 在第一条之前的文本中查找前言
+        pre_lines = pre_text.split('\n')
+        preamble_lines = []
+        in_preamble = False
+        
+        for line in pre_lines:
+            line_strip = line.strip()
+            if not line_strip:
+                continue
+            # 跳过结构行
+            if is_structure_line(line_strip):
+                continue
+            # 检测前言开始：以"为"或"根据"开头
+            if line_strip.startswith('为') or line_strip.startswith('根据'):
+                in_preamble = True
+            if in_preamble:
+                preamble_lines.append(line_strip)
+            # 检测前言结束：以"："结尾
+            if in_preamble and (line_strip.endswith('：') or line_strip.endswith(':')):
+                break
+        
+        if preamble_lines:
+            preamble_content = ''.join(preamble_lines)
+            logging.info(f"   📋 识别到前言: {preamble_content[:50]}...")
+
 
         for i, match in enumerate(matches):
             start = match.start()
@@ -299,6 +451,9 @@ class LocalImporter:
             # 重新组合内容
             content_str = '\n'.join(cleaned_lines).strip()
             
+            # 移除开头的条号（如"第一条 "或"第一条　"）
+            content_str = re.sub(r'^' + re.escape(article_display) + r'[\s\u3000]*', '', content_str)
+            
             articles.append({
                 "article_num": article_num,
                 "article_display": article_display,
@@ -310,6 +465,21 @@ class LocalImporter:
             # 更新结构层级，供下一条使用
             for struct_line in found_next_structures:
                 update_structure(struct_line)
+        
+        # ===== 新增：将前言插入为第零条 =====
+        if preamble_content:
+            # 重新编号：所有条文 article_num + 1
+            for art in articles:
+                art["article_num"] += 1
+            # 插入前言
+            articles.insert(0, {
+                "article_num": 0,
+                "article_display": "前言",
+                "content": preamble_content,
+                "chapter": "",
+                "section": ""
+            })
+            logging.info(f"   ✅ 已将前言作为第0条插入")
 
         return articles
 
@@ -411,8 +581,11 @@ class LocalImporter:
             # 1. 解析元数据
             metadata = self.parse_metadata(content)
             
-            # 优先使用从文档末尾解析到的标题
-            if metadata.get("title_from_tail"):
+            # 优先使用合并后的标题 > 文档末尾的标题 > 文件名
+            if metadata.get("merged_title"):
+                title = metadata["merged_title"]
+                logging.info(f"   📋 使用合并标题: {title}")
+            elif metadata.get("title_from_tail"):
                 title = metadata["title_from_tail"]
                 logging.info(f"   📋 使用文档中的标题: {title}")
             

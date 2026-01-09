@@ -63,7 +63,7 @@ export default function LawsList() {
     const [loading, setLoading] = useState(false);
     const [pagination, setPagination] = useState({
         current: 1,
-        pageSize: 20,
+        pageSize: 9,
         total: 0,
     });
 
@@ -123,6 +123,9 @@ export default function LawsList() {
                 if (activeCategory !== '全部') {
                     params.category = activeCategory;
                 }
+                if (titleFilter) {
+                    params.title = titleFilter;
+                }
                 const response = await getLawsList(params);
                 if (response.success) {
                     setLaws(response.data || []);
@@ -134,21 +137,21 @@ export default function LawsList() {
                 setLoading(false);
             }
         };
-        fetchLaws();
-    }, [pagination.current, activeCategory]);
+
+        // 简单的防抖：如果是有标题搜索，延迟 300ms 执行
+        if (titleFilter) {
+            const timer = setTimeout(fetchLaws, 300);
+            return () => clearTimeout(timer);
+        } else {
+            fetchLaws();
+        }
+    }, [pagination.current, activeCategory, titleFilter, pagination.pageSize]);
 
     const handleSearch = () => {
         if (filterText.trim()) {
             navigate(`/search?q=${encodeURIComponent(filterText)}`);
         }
     };
-
-    // 使用 useMemo 缓存过滤结果，避免重复计算
-    const filteredLaws = useMemo(() => {
-        if (!titleFilter) return laws;
-        const lowerFilter = titleFilter.toLowerCase();
-        return laws.filter(law => law.title.toLowerCase().includes(lowerFilter));
-    }, [laws, titleFilter]);
 
     const handleClosePopup = () => {
         setShowPopup(false);
@@ -236,7 +239,10 @@ export default function LawsList() {
                                     type="text"
                                     placeholder="输入法规名称进行筛选..."
                                     value={titleFilter}
-                                    onChange={(e) => setTitleFilter(e.target.value)}
+                                    onChange={(e) => {
+                                        setTitleFilter(e.target.value);
+                                        setPagination(p => ({ ...p, current: 1 }));
+                                    }}
                                     style={{
                                         border: 'none',
                                         background: 'transparent',
@@ -249,7 +255,10 @@ export default function LawsList() {
                                 />
                                 {titleFilter && (
                                     <button
-                                        onClick={() => setTitleFilter('')}
+                                        onClick={() => {
+                                            setTitleFilter('');
+                                            setPagination(p => ({ ...p, current: 1 }));
+                                        }}
                                         style={{
                                             background: 'none',
                                             border: 'none',
@@ -267,10 +276,10 @@ export default function LawsList() {
 
                         {loading ? (
                             <div className="loading-spinner"><div className="spinner"></div></div>
-                        ) : filteredLaws.length > 0 ? (
+                        ) : laws.length > 0 ? (
                             <>
                                 <div className="card-grid">
-                                    {filteredLaws.map(law => (
+                                    {laws.map(law => (
                                         <LawCard key={law.law_id} law={law} onClick={(l) => navigate(`/laws/${l.law_id}`)} />
                                     ))}
                                 </div>
