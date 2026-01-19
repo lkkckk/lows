@@ -224,3 +224,24 @@ docker-compose down -v   # ⚠️ 同时删除数据卷
 ---
 
 **祝使用愉快！** 🎉
+
+## Search Engine (OpenSearch/Elasticsearch)
+
+Optional: configure a search engine for better Chinese tokenization and ranking.
+
+Environment variables:
+- SEARCH_ENGINE_URL / OPENSEARCH_URL / ELASTICSEARCH_URL
+- SEARCH_ENGINE_INDEX (default: law_articles)
+- SEARCH_ENGINE_ANALYZER (default: ik_smart)
+- SEARCH_ENGINE_USER / SEARCH_ENGINE_PASSWORD (optional)
+- SEARCH_ENGINE_VERIFY_SSL (default: true)
+
+Index and reindex:
+```bash
+# Recreate index and reindex from MongoDB
+python backend/scripts/search_engine_reindex.py --recreate
+```
+
+Notes:
+- If ik_smart is not installed, the script falls back to standard analyzer.
+- After indexing, /api/laws/search will use the search engine if URL is set.

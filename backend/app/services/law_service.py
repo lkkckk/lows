@@ -5,6 +5,9 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.models import LawCreate
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from pathlib import Path
+import json
+from app.services.search_engine import get_search_engine
 import hashlib
 import re
 import math
@@ -22,6 +25,67 @@ LAW_WEIGHT_CONFIG = {
     "公安机关办理刑事案件程序规定": 80,
 }
 DEFAULT_WEIGHT = 50
+
+
+COMMON_LAW_PREFIXES = [
+    "中华人民共和国",
+    "中华人民",
+    "全国人民代表大会",
+    "最高人民法院",
+    "最高人民检察院",
+]
+
+_LAW_ALIAS_MAP: Optional[Dict[str, str]] = None
+
+
+def _normalize_law_name(keyword: str) -> str:
+    if not keyword:
+        return ""
+
+    cleaned = re.sub(r"[^\u4e00-\u9fa5A-Za-z0-9]+", "", keyword)
+    if not cleaned:
+        return ""
+
+    for prefix in COMMON_LAW_PREFIXES:
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+            break
+
+    return cleaned
+
+
+def _load_law_alias_map() -> Dict[str, str]:
+    global _LAW_ALIAS_MAP
+    if _LAW_ALIAS_MAP is not None:
+        return _LAW_ALIAS_MAP
+
+    alias_map: Dict[str, str] = {}
+    alias_path = Path(__file__).resolve().parents[1] / "data" / "law_aliases.json"
+    if alias_path.exists():
+        try:
+            data = json.loads(alias_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                for canonical, aliases in data.items():
+                    norm_key = _normalize_law_name(canonical)
+                    if norm_key:
+                        alias_map[norm_key] = canonical
+                    if isinstance(aliases, list):
+                        for alias in aliases:
+                            norm_alias = _normalize_law_name(alias)
+                            if norm_alias:
+                                alias_map[norm_alias] = canonical
+        except Exception:
+            alias_map = {}
+
+    _LAW_ALIAS_MAP = alias_map
+    return alias_map
+
+
+def _resolve_law_alias(keyword: str) -> str:
+    normalized = _normalize_law_name(keyword)
+    if not normalized:
+        return ""
+    return _load_law_alias_map().get(normalized, normalized)
 
 
 def get_law_weight(title: str) -> int:
@@ -290,6 +354,130 @@ class LawService:
 
         return None
 
+    def _extract_law_keyword(self, query: str) -> str:
+        """
+        Extract law name part from a query that includes an article number.
+        """
+        if not query:
+            return ""
+
+        cn_nums = "\u96f6\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\u5343"
+        text = re.sub(rf"\u7b2c?[{cn_nums}]+\u6761", " ", query)
+        text = re.sub(r"\u7b2c?\d+\u6761", " ", text)
+
+        return text.strip()
+
+    def _normalize_law_keyword(self, keyword: str) -> str:
+        """
+        Normalize law keyword for fuzzy title matching.
+        """
+        return _normalize_law_name(keyword)
+
+    def _build_title_fuzzy_regex(self, keyword: str) -> Optional[str]:
+        """
+        Build a fuzzy regex that requires all tokens to appear in the title.
+        """
+        if not keyword or len(keyword) <= 1:
+            return None
+
+        if len(keyword) <= 4:
+            tokens = list(keyword)
+        else:
+            tokens = [keyword[i:i + 2] for i in range(len(keyword) - 1)]
+
+        tokens = [t for t in tokens if t.strip()]
+        if not tokens:
+            return None
+
+        lookaheads = "".join(f"(?=.*{re.escape(t)})" for t in tokens)
+        return f"{lookaheads}.*"
+
+    async def _find_laws_by_keyword(self, keyword: str) -> List[Dict[str, Any]]:
+        """
+        Find candidate laws by keyword using exact-substring, then fuzzy match.
+        """
+        if not keyword:
+            return []
+
+        exact = await self.laws_collection.find(
+            {"title": {"$regex": re.escape(keyword), "$options": "i"}},
+            {"full_text": 0},
+        ).to_list(length=20)
+        if exact:
+            return exact
+
+        fuzzy_regex = self._build_title_fuzzy_regex(keyword)
+        if not fuzzy_regex:
+            return []
+
+        return await self.laws_collection.find(
+            {"title": {"$regex": fuzzy_regex, "$options": "i"}},
+            {"full_text": 0},
+        ).to_list(length=20)
+
+    async def _search_by_law_article(
+        self, query: str, article_num: int, page: int, page_size: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Search by law name + article number pattern.
+        """
+        raw_keyword = self._extract_law_keyword(query)
+        if not raw_keyword:
+            return None
+
+        keywords = []
+        resolved = _resolve_law_alias(raw_keyword)
+        if resolved:
+            keywords.append(resolved)
+        normalized = _normalize_law_name(raw_keyword)
+        if normalized and normalized not in keywords:
+            keywords.append(normalized)
+
+        laws = []
+        for keyword in keywords:
+            laws = await self._find_laws_by_keyword(keyword)
+            if laws:
+                break
+        if not laws:
+            return None
+
+        law_map = {law["law_id"]: law for law in laws}
+        law_ids = list(law_map.keys())
+
+        search_query = {"law_id": {"$in": law_ids}, "article_num": article_num}
+        total = await self.articles_collection.count_documents(search_query)
+        total_pages = math.ceil(total / page_size) if total > 0 else 0
+        skip = (page - 1) * page_size
+
+        cursor = self.articles_collection.find(search_query).skip(skip).limit(page_size)
+        articles = await cursor.to_list(length=page_size)
+
+        results = []
+        for article in articles:
+            article["_id"] = str(article["_id"])
+            law_info = law_map.get(article["law_id"], {})
+            results.append({
+                "law_id": article["law_id"],
+                "law_title": law_info.get("title", ""),
+                "law_category": law_info.get("category", ""),
+                "article_num": article.get("article_num"),
+                "article_display": article.get("article_display", ""),
+                "content": article.get("content", ""),
+                "highlight": self._generate_highlight(
+                    article.get("content", ""), normalized
+                ),
+            })
+
+        return {
+            "data": results,
+            "pagination": {
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": total_pages,
+            }
+        }
+
     def _chinese_to_arabic(self, chinese_num: str, num_map: Dict[str, int]) -> int:
         """
         中文数字转阿拉伯数字
@@ -298,32 +486,20 @@ class LawService:
         if not chinese_num:
             return 0
 
-        # 特殊处理"十"开头的情况（如"十三" = 13）
-        if chinese_num.startswith('十'):
-            chinese_num = '一' + chinese_num
-
         result = 0
-        temp = 0
-        unit = 1
+        current = 0
 
-        for char in reversed(chinese_num):
+        for char in chinese_num:
             num = num_map.get(char, 0)
+            if num >= 10:  # 单位（十、百、千）
+                if current == 0:
+                    current = 1
+                result += current * num
+                current = 0
+            else:
+                current = num
 
-            if num >= 10:  # 遇到单位（十、百、千）
-                if num > unit:
-                    unit = num
-                else:
-                    unit *= num
-
-                if temp == 0:
-                    temp = unit
-            else:  # 遇到数字
-                temp = num * unit
-
-            result += temp
-            temp = 0
-
-        return result
+        return result + current
 
     async def search_in_law(
         self, law_id: str, query: str, page: int = 1, page_size: int = 20
@@ -394,7 +570,22 @@ class LawService:
         """
         import time
         start_time = time.time()
-        
+
+        article_num = self.parse_article_input(query)
+        if article_num:
+            article_result = await self._search_by_law_article(query, article_num, page, page_size)
+            if article_result is not None:
+                return article_result
+
+        search_engine = get_search_engine()
+        if search_engine.enabled:
+            try:
+                engine_result = await search_engine.search_articles(query, page, page_size)
+                if engine_result is not None:
+                    return engine_result
+            except Exception:
+                pass
+
         # 使用正则表达式搜索（确保准确性，任何子字符串都能被找到）
         search_query = {"content": {"$regex": query, "$options": "i"}}
         total = await self.articles_collection.count_documents(search_query)
