@@ -131,6 +131,18 @@ async def get_today_views(service: LawService = Depends(get_law_service)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/stats/total-views", response_model=APIResponse)
+async def get_total_views(service: LawService = Depends(get_law_service)):
+    """
+    Get total view count.
+    """
+    try:
+        count = await service.get_total_views()
+        return APIResponse(success=True, data={"total_views": count})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 动态路径路由（{law_id}）====================
 
 @router.get("/{law_id}", response_model=APIResponse)

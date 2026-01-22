@@ -9,7 +9,7 @@ import {
     Bell, ToggleLeft, ToggleRight, LogOut, LayoutDashboard, BookOpen,
     PieChart, TrendingUp, FileText, Bot, Shield
 } from 'lucide-react';
-import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews, getAiSettings, getAiPresets, updateAiSettings } from '../services/api';
+import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews, getTotalViews, getAiSettings, getAiPresets, updateAiSettings } from '../services/api';
 import '../styles/Admin.css';
 
 const STATUS_OPTIONS = [
@@ -23,7 +23,7 @@ const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程�
 const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
 // ==================== 仪表盘模块 ====================
-const DashboardModule = ({ laws, todayViews }) => {
+const DashboardModule = ({ laws, todayViews, totalViews }) => {
     // 计算分类统计
     const categoryStats = useMemo(() => {
         const stats = {};
@@ -70,6 +70,13 @@ const DashboardModule = ({ laws, todayViews }) => {
                     <div className="stat-info">
                         <span className="stat-value">{categoryStats.length}</span>
                         <span className="stat-label">分类数量</span>
+                    </div>
+                </div>
+                <div className="stat-card info">
+                    <div className="stat-icon"><Eye size={28} /></div>
+                    <div className="stat-info">
+                        <span className="stat-value">{totalViews}</span>
+                        <span className="stat-label">总浏览量</span>
                     </div>
                 </div>
                 <div className="stat-card warning">
@@ -346,6 +353,7 @@ export default function Admin() {
     const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [saving, setSaving] = useState(false);
     const [todayViews, setTodayViews] = useState(0);
+    const [totalViews, setTotalViews] = useState(0);
 
     const [popupSettings, setPopupSettings] = useState({
         enabled: false,
@@ -369,6 +377,7 @@ export default function Admin() {
         fetchLaws();
         fetchPopupSettings();
         fetchTodayViews();
+        fetchTotalViews();
         fetchAiSettings();
     }, []);
 
@@ -401,6 +410,17 @@ export default function Admin() {
             }
         } catch (error) {
             console.error('加载今日浏览失败:', error);
+        }
+    };
+
+    const fetchTotalViews = async () => {
+        try {
+            const response = await getTotalViews();
+            if (response.success) {
+                setTotalViews(response.data?.total_views || 0);
+            }
+        } catch (error) {
+            console.error('Failed to load total views:', error);
         }
     };
 
@@ -571,7 +591,7 @@ export default function Admin() {
 
                 {/* 内容区 */}
                 <main className="admin-main">
-                    {activeTab === 'dashboard' && <DashboardModule laws={laws} todayViews={todayViews} />}
+                    {activeTab === 'dashboard' && <DashboardModule laws={laws} todayViews={todayViews} totalViews={totalViews} />}
                     {activeTab === 'laws' && (
                         <LawsModule
                             laws={laws}

@@ -104,6 +104,13 @@ export const getTodayViews = () => {
 };
 
 /**
+ * Get total views stats.
+ */
+export const getTotalViews = () => {
+    return apiClient.get('/laws/stats/total-views');
+};
+
+/**
  * 更新法规信息（管理功能）
  */
 export const updateLaw = (lawId, data) => {

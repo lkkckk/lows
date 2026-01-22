@@ -696,3 +696,7 @@ class LawService:
             "viewed_at": {"$gte": today}
         })
         return count
+
+    async def get_total_views(self) -> int:
+        """Get total view count."""
+        return await self.view_logs_collection.count_documents({})
