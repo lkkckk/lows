@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 
 from app.services.ai_service import chat_with_ai
+from app.db import get_database
 
 router = APIRouter(prefix="/ai", tags=["AI 问法"])
 
@@ -45,10 +46,14 @@ async def chat(request: ChatRequest):
         if request.history:
             history = [{"role": msg.role, "content": msg.content} for msg in request.history]
         
-        # 调用 AI 服务
-        reply = await chat_with_ai(request.message, history)
+        # 获取数据库连接
+        db = get_database()
+        
+        # 调用 AI 服务（传递数据库以读取配置）
+        reply = await chat_with_ai(request.message, history, db)
         
         return ChatResponse(reply=reply, success=True)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

@@ -1,14 +1,15 @@
 """
-AI 服务模块 - 封装 DeepSeek API 调用
+AI 服务模块 - 从数据库读取配置，支持动态切换模型
 """
 import os
 import httpx
 from typing import Optional
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
-# DeepSeek API 配置
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "sk-5c3527fd88614f818d18c45a93dcf5da")
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
-DEEPSEEK_MODEL = "deepseek-chat"
+# 默认配置（当数据库无配置时使用）
+DEFAULT_API_URL = "https://api.deepseek.com/v1/chat/completions"
+DEFAULT_MODEL = "deepseek-chat"
+DEFAULT_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
 # 系统提示词 - 定义 AI 助手人设
 SYSTEM_PROMPT = """你是一位专业的法律助手，服务于中国公安执法人员。你的职责是：
@@ -21,17 +22,56 @@ SYSTEM_PROMPT = """你是一位专业的法律助手，服务于中国公安执�
 注意：你的回答仅供参考，不构成正式法律意见。"""
 
 
-async def chat_with_ai(message: str, history: Optional[list] = None) -> str:
+async def get_ai_config(db: AsyncIOMotorDatabase) -> dict:
+    """从数据库获取 AI 配置"""
+    settings = await db.settings.find_one({"key": "ai_config"})
+    if settings:
+        return {
+            "api_url": settings.get("api_url", DEFAULT_API_URL),
+            "api_key": settings.get("api_key", DEFAULT_API_KEY),
+            "model_name": settings.get("model_name", DEFAULT_MODEL),
+            "skip_ssl_verify": settings.get("skip_ssl_verify", False),
+        }
+    # 返回默认配置
+    return {
+        "api_url": DEFAULT_API_URL,
+        "api_key": DEFAULT_API_KEY,
+        "model_name": DEFAULT_MODEL,
+        "skip_ssl_verify": False,
+    }
+
+
+async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIOMotorDatabase = None) -> str:
     """
-    与 DeepSeek AI 进行对话
+    与 AI 进行对话（从数据库读取配置）
     
     Args:
         message: 用户消息
         history: 对话历史（可选）
+        db: 数据库连接
     
     Returns:
         AI 回复内容
     """
+    # 获取配置
+    if db:
+        config = await get_ai_config(db)
+    else:
+        config = {
+            "api_url": DEFAULT_API_URL,
+            "api_key": DEFAULT_API_KEY,
+            "model_name": DEFAULT_MODEL,
+            "skip_ssl_verify": False,
+        }
+    
+    api_url = config["api_url"]
+    api_key = config["api_key"]
+    model_name = config["model_name"]
+    skip_ssl_verify = config["skip_ssl_verify"]
+    
+    if not api_key:
+        raise Exception("AI 服务未配置 API Key，请在后台管理页面配置")
+    
     # 构建消息列表
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     
@@ -42,17 +82,17 @@ async def chat_with_ai(message: str, history: Optional[list] = None) -> str:
     # 添加当前用户消息
     messages.append({"role": "user", "content": message})
     
-    # 调用 DeepSeek API
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    # 调用 AI API
+    async with httpx.AsyncClient(timeout=60.0, verify=not skip_ssl_verify) as client:
         try:
             response = await client.post(
-                DEEPSEEK_API_URL,
+                api_url,
                 headers={
-                    "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": DEEPSEEK_MODEL,
+                    "model": model_name,
                     "messages": messages,
                     "temperature": 0.7,
                     "max_tokens": 2000,

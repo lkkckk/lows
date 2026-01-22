@@ -7,9 +7,9 @@ import { message } from 'antd';
 import {
     Settings, Trash2, Edit3, Eye, AlertTriangle, ChevronLeft, X, Save,
     Bell, ToggleLeft, ToggleRight, LogOut, LayoutDashboard, BookOpen,
-    PieChart, TrendingUp, FileText
+    PieChart, TrendingUp, FileText, Bot, Shield
 } from 'lucide-react';
-import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews } from '../services/api';
+import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews, getAiSettings, getAiPresets, updateAiSettings } from '../services/api';
 import '../styles/Admin.css';
 
 const STATUS_OPTIONS = [
@@ -19,7 +19,7 @@ const STATUS_OPTIONS = [
     { value: '已修订', label: '已修订', color: '#6b7280' },
 ];
 
-const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '其他'];
+const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '内部规章', '其他'];
 const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
 // ==================== 仪表盘模块 ====================
@@ -210,15 +210,98 @@ const LawsModule = ({ laws, onEdit, onDelete, onView }) => {
 };
 
 // ==================== 系统设置模块 ====================
-const SettingsModule = ({ popupSettings, onChange, onSave, saving }) => (
+const SettingsModule = ({ popupSettings, onPopupChange, onPopupSave, popupSaving, aiSettings, aiPresets, onAiChange, onAiPresetChange, onAiSave, aiSaving }) => (
     <div className="settings-module">
+        {/* AI 模型配置 */}
+        <div className="settings-section">
+            <div className="section-header">
+                <Bot size={20} />
+                <h3>AI 模型配置</h3>
+            </div>
+            <div className="section-body">
+                <div className="form-group">
+                    <label>选择模型</label>
+                    <div className="radio-group">
+                        {Object.entries(aiPresets).map(([key, preset]) => (
+                            <label key={key} className="radio-label">
+                                <input
+                                    type="radio"
+                                    name="ai_provider"
+                                    value={key}
+                                    checked={aiSettings.provider === key}
+                                    onChange={() => onAiPresetChange(key)}
+                                />
+                                <span>{preset.name}</span>
+                            </label>
+                        ))}
+                        <label className="radio-label">
+                            <input
+                                type="radio"
+                                name="ai_provider"
+                                value="custom"
+                                checked={aiSettings.provider === 'custom'}
+                                onChange={() => onAiChange('provider', 'custom')}
+                            />
+                            <span>自定义</span>
+                        </label>
+                    </div>
+                </div>
+                <div className="form-group">
+                    <label>API URL</label>
+                    <input
+                        type="text"
+                        placeholder="例如：https://api.deepseek.com/v1/chat/completions"
+                        value={aiSettings.api_url}
+                        onChange={(e) => onAiChange('api_url', e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label>API Key</label>
+                    <input
+                        type="password"
+                        placeholder="输入 API Key"
+                        value={aiSettings.api_key}
+                        onChange={(e) => onAiChange('api_key', e.target.value)}
+                    />
+                </div>
+                <div className="form-group">
+                    <label>模型名称</label>
+                    <input
+                        type="text"
+                        placeholder="例如：deepseek-chat"
+                        value={aiSettings.model_name}
+                        onChange={(e) => onAiChange('model_name', e.target.value)}
+                    />
+                </div>
+                <div className="form-group checkbox-group">
+                    <label className="checkbox-label">
+                        <input
+                            type="checkbox"
+                            checked={aiSettings.skip_ssl_verify}
+                            onChange={(e) => onAiChange('skip_ssl_verify', e.target.checked)}
+                        />
+                        <Shield size={16} />
+                        <span>忽略 SSL 证书验证（内网自建模型可能需要）</span>
+                    </label>
+                </div>
+                <button className="btn-primary" onClick={onAiSave} disabled={aiSaving}>
+                    <Save size={16} />
+                    {aiSaving ? '保存中...' : '保存 AI 配置'}
+                </button>
+            </div>
+        </div>
+
+        {/* 分隔线 */}
+        <hr className="settings-divider" />
+
+        {/* 首页弹窗设置 */}
         <div className="settings-section">
             <div className="section-header">
                 <Bell size={20} />
                 <h3>首页弹窗设置</h3>
                 <button
                     className={`toggle-switch ${popupSettings.enabled ? 'active' : ''}`}
-                    onClick={() => onChange('enabled', !popupSettings.enabled)}
+                    onClick={() => onPopupChange('enabled', !popupSettings.enabled)}
                 >
                     {popupSettings.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                     <span>{popupSettings.enabled ? '已开启' : '已关闭'}</span>
@@ -231,7 +314,7 @@ const SettingsModule = ({ popupSettings, onChange, onSave, saving }) => (
                         type="text"
                         placeholder="请输入弹窗标题..."
                         value={popupSettings.title}
-                        onChange={(e) => onChange('title', e.target.value)}
+                        onChange={(e) => onPopupChange('title', e.target.value)}
                     />
                 </div>
                 <div className="form-group">
@@ -239,13 +322,13 @@ const SettingsModule = ({ popupSettings, onChange, onSave, saving }) => (
                     <textarea
                         placeholder="请输入弹窗内容..."
                         value={popupSettings.content}
-                        onChange={(e) => onChange('content', e.target.value)}
+                        onChange={(e) => onPopupChange('content', e.target.value)}
                         rows={4}
                     />
                 </div>
-                <button className="btn-primary" onClick={onSave} disabled={saving}>
+                <button className="btn-primary" onClick={onPopupSave} disabled={popupSaving}>
                     <Save size={16} />
-                    {saving ? '保存中...' : '保存设置'}
+                    {popupSaving ? '保存中...' : '保存设置'}
                 </button>
             </div>
         </div>
@@ -271,10 +354,22 @@ export default function Admin() {
     });
     const [popupSaving, setPopupSaving] = useState(false);
 
+    // AI 配置状态
+    const [aiSettings, setAiSettings] = useState({
+        provider: 'deepseek',
+        api_url: '',
+        api_key: '',
+        model_name: '',
+        skip_ssl_verify: false,
+    });
+    const [aiPresets, setAiPresets] = useState({});
+    const [aiSaving, setAiSaving] = useState(false);
+
     useEffect(() => {
         fetchLaws();
         fetchPopupSettings();
         fetchTodayViews();
+        fetchAiSettings();
     }, []);
 
     const fetchLaws = async () => {
@@ -322,6 +417,53 @@ export default function Admin() {
             message.error('保存失败');
         } finally {
             setPopupSaving(false);
+        }
+    };
+
+    // AI 配置相关函数
+    const fetchAiSettings = async () => {
+        try {
+            const [settingsRes, presetsRes] = await Promise.all([
+                getAiSettings(),
+                getAiPresets()
+            ]);
+            setAiSettings(settingsRes);
+            setAiPresets(presetsRes);
+        } catch (error) {
+            console.error('加载 AI 配置失败:', error);
+        }
+    };
+
+    const handleAiChange = (field, value) => {
+        setAiSettings(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleAiPresetChange = (presetKey) => {
+        const preset = aiPresets[presetKey];
+        if (preset) {
+            setAiSettings(prev => ({
+                ...prev,
+                provider: presetKey,
+                api_url: preset.api_url,
+                model_name: preset.model_name,
+                skip_ssl_verify: preset.skip_ssl_verify,
+            }));
+        }
+    };
+
+    const handleSaveAi = async () => {
+        if (!aiSettings.api_key) {
+            message.warning('请输入 API Key');
+            return;
+        }
+        setAiSaving(true);
+        try {
+            await updateAiSettings(aiSettings);
+            message.success('AI 配置已保存');
+        } catch (error) {
+            message.error('保存失败');
+        } finally {
+            setAiSaving(false);
         }
     };
 
@@ -441,9 +583,15 @@ export default function Admin() {
                     {activeTab === 'settings' && (
                         <SettingsModule
                             popupSettings={popupSettings}
-                            onChange={handlePopupChange}
-                            onSave={handleSavePopup}
-                            saving={popupSaving}
+                            onPopupChange={handlePopupChange}
+                            onPopupSave={handleSavePopup}
+                            popupSaving={popupSaving}
+                            aiSettings={aiSettings}
+                            aiPresets={aiPresets}
+                            onAiChange={handleAiChange}
+                            onAiPresetChange={handleAiPresetChange}
+                            onAiSave={handleSaveAi}
+                            aiSaving={aiSaving}
                         />
                     )}
                 </main>

@@ -221,3 +221,24 @@ export const adminLogin = (password) => {
 export const sendAiMessage = (message, history = null) => {
     return apiClient.post('/ai/chat', { message, history });
 };
+
+/**
+ * 获取 AI 模型配置
+ */
+export const getAiSettings = () => {
+    return apiClient.get('/settings/ai');
+};
+
+/**
+ * 获取 AI 预设模型列表
+ */
+export const getAiPresets = () => {
+    return apiClient.get('/settings/ai/presets');
+};
+
+/**
+ * 更新 AI 模型配置
+ */
+export const updateAiSettings = (data) => {
+    return apiClient.put('/settings/ai', data);
+};

@@ -26,6 +26,16 @@ LAW_WEIGHT_CONFIG = {
 }
 DEFAULT_WEIGHT = 50
 
+DEFAULT_LAW_CATEGORIES = [
+    "刑事法律",
+    "行政法律",
+    "民事法律",
+    "程序规定",
+    "司法解释",
+    "内部规章",
+    "其他",
+]
+
 
 COMMON_LAW_PREFIXES = [
     "中华人民共和国",
@@ -669,8 +679,10 @@ class LawService:
     async def get_categories(self) -> List[str]:
         """获取所有法规分类（只返回数据库中实际存在的分类）"""
         categories = await self.laws_collection.distinct("category")
-        # 过滤空值并排序
-        return sorted([c for c in categories if c])
+        # 过滤空值并与默认分类合并后排序
+        normalized = [c for c in categories if c]
+        merged = set(normalized) | set(DEFAULT_LAW_CATEGORIES)
+        return sorted(merged)
 
     async def get_levels(self) -> List[str]:
         """

@@ -309,7 +309,7 @@ export default function LawEditor() {
     const [submitting, setSubmitting] = useState(false);
 
     // 动态选项状态
-    const [categories, setCategories] = useState(['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '其他']);
+    const [categories, setCategories] = useState(['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '内部规章', '其他']);
     const [levels, setLevels] = useState(['法律', '行政法规', '部门规章', '地方性法规', '司法解释', '宪法']);
 
     useEffect(() => {

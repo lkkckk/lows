@@ -38,8 +38,8 @@ crawler/output/*.jsonl
 crawler/*_seen_urls.txt
 crawler/manual_data/
 
-# 部署包大文件
-deploy_package/*.tar
+# 部署包
+deploy_package/
 
 # Docker
 *.log
