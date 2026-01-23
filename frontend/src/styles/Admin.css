@@ -1065,7 +1065,12 @@
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     padding-bottom: 1px;
     overflow-x: auto;
-    scrollbar-width: none;
+}
+
+@supports (scrollbar-width: none) {
+    .settings-tabs-header {
+        scrollbar-width: none;
+    }
 }
 
 .settings-tabs-header::-webkit-scrollbar {
