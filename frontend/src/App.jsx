@@ -52,8 +52,8 @@ const Navbar = () => {
                     {[
                         { id: 'laws', label: '法规库', icon: Book },
                         { id: 'search', label: '全文检索', icon: SearchIcon },
-                        { id: 'templates', label: '文书模板', icon: FileText },
                         { id: 'ai', label: 'AI问法', icon: Sparkles },
+                        { id: 'templates', label: '文书模板', icon: FileText },
                     ].map((item) => (
                         <button
                             key={item.id}

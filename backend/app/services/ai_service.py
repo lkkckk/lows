@@ -3,7 +3,7 @@ AI 服务模块 - 从数据库读取配置，支持动态切换模型
 """
 import os
 import httpx
-from typing import Optional
+from typing import Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 # 默认配置（当数据库无配置时使用）
@@ -41,7 +41,7 @@ async def get_ai_config(db: AsyncIOMotorDatabase) -> dict:
     }
 
 
-async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIOMotorDatabase = None) -> str:
+async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIOMotorDatabase = None) -> Dict[str, Any]:
     """
     与 AI 进行对话（从数据库读取配置）
     
@@ -51,10 +51,10 @@ async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIO
         db: 数据库连接
     
     Returns:
-        AI 回复内容
+        包含 reply 和 usage 的字典
     """
     # 获取配置
-    if db:
+    if db is not None:
         config = await get_ai_config(db)
     else:
         config = {
@@ -102,7 +102,19 @@ async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIO
             data = response.json()
             
             # 提取 AI 回复
-            return data["choices"][0]["message"]["content"]
+            reply = data["choices"][0]["message"]["content"]
+            
+            # 提取 Token 统计（如果 API 返回）
+            usage = data.get("usage", {})
+            
+            return {
+                "reply": reply,
+                "usage": {
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
+                }
+            }
             
         except httpx.HTTPStatusError as e:
             error_msg = f"AI 服务请求失败: {e.response.status_code}"

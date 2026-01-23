@@ -143,6 +143,53 @@ async def get_total_views(service: LawService = Depends(get_law_service)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ==================== 内部规章相关 ====================
+
+@router.get("/internal-docs/check", response_model=APIResponse)
+async def check_internal_docs(service: LawService = Depends(get_law_service)):
+    """
+    检查是否存在内部规章（用于前端决定是否显示入口）
+    """
+    try:
+        result = await service.get_laws_list(
+            page=1,
+            page_size=1,
+            category="内部规章"
+        )
+        has_data = result["pagination"]["total"] > 0
+        return APIResponse(success=True, data={"has_data": has_data, "count": result["pagination"]["total"]})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/internal-docs/list", response_model=APIResponse)
+async def get_internal_docs(
+    request: Request,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    service: LawService = Depends(get_law_service),
+):
+    """
+    获取内部规章列表（需要 IP 验证）
+    """
+    from .ip_filter import verify_internal_docs_access
+    await verify_internal_docs_access(request)
+    
+    try:
+        result = await service.get_laws_list(
+            page=page,
+            page_size=page_size,
+            category="内部规章"
+        )
+        return APIResponse(
+            success=True,
+            data=result["data"],
+            pagination=result["pagination"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== 动态路径路由（{law_id}）====================
 
 @router.get("/{law_id}", response_model=APIResponse)

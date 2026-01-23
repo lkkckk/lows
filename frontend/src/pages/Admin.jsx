@@ -7,9 +7,9 @@ import { message } from 'antd';
 import {
     Settings, Trash2, Edit3, Eye, AlertTriangle, ChevronLeft, X, Save,
     Bell, ToggleLeft, ToggleRight, LogOut, LayoutDashboard, BookOpen,
-    PieChart, TrendingUp, FileText, Bot, Shield
+    PieChart, TrendingUp, FileText, Bot, Shield, Network, Sparkles
 } from 'lucide-react';
-import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews, getTotalViews, getAiSettings, getAiPresets, updateAiSettings } from '../services/api';
+import { getLawsList, updateLaw, deleteLaw, getLawCategories, getLawLevels, getPopupSettings, updatePopupSettings, getTodayViews, getTotalViews, getAiSettings, getAiPresets, updateAiSettings, getIpAccessSettings, updateIpAccessSettings, getAiTokenUsage } from '../services/api';
 import '../styles/Admin.css';
 
 const STATUS_OPTIONS = [
@@ -23,7 +23,7 @@ const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程�
 const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
 // ==================== 仪表盘模块 ====================
-const DashboardModule = ({ laws, todayViews, totalViews }) => {
+const DashboardModule = ({ laws, todayViews, totalViews, tokenUsage }) => {
     // 计算分类统计
     const categoryStats = useMemo(() => {
         const stats = {};
@@ -84,6 +84,13 @@ const DashboardModule = ({ laws, todayViews, totalViews }) => {
                     <div className="stat-info">
                         <span className="stat-value">{todayViews}</span>
                         <span className="stat-label">今日浏览</span>
+                    </div>
+                </div>
+                <div className="stat-card" style={{ background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)' }}>
+                    <div className="stat-icon" style={{ background: 'rgba(255,255,255,0.2)' }}><Sparkles size={28} /></div>
+                    <div className="stat-info">
+                        <span className="stat-value">{tokenUsage.total_tokens?.toLocaleString() || 0}</span>
+                        <span className="stat-label">AI Token 用量</span>
                     </div>
                 </div>
             </div>
@@ -217,130 +224,239 @@ const LawsModule = ({ laws, onEdit, onDelete, onView }) => {
 };
 
 // ==================== 系统设置模块 ====================
-const SettingsModule = ({ popupSettings, onPopupChange, onPopupSave, popupSaving, aiSettings, aiPresets, onAiChange, onAiPresetChange, onAiSave, aiSaving }) => (
-    <div className="settings-module">
-        {/* AI 模型配置 */}
-        <div className="settings-section">
-            <div className="section-header">
-                <Bot size={20} />
-                <h3>AI 模型配置</h3>
+// ==================== 系统设置模块 ====================
+const SettingsModule = ({ popupSettings, onPopupChange, onPopupSave, popupSaving, aiSettings, aiPresets, onAiChange, onAiPresetChange, onAiSave, aiSaving, ipAccessSettings, onIpAccessChange, onIpWhitelistChange, onIpAccessSave, ipAccessSaving }) => {
+    const [activeTab, setActiveTab] = useState('ai'); // 'ai' | 'ip' | 'popup'
+
+    return (
+        <div className="settings-module">
+            {/* 标签导航栏 */}
+            <div className="settings-tabs-header">
+                <button
+                    className={`tab-btn ${activeTab === 'ai' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('ai')}
+                >
+                    <Bot size={18} />
+                    <span>AI 模型</span>
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'ip' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('ip')}
+                >
+                    <Network size={18} />
+                    <span>IP 访问控制</span>
+                </button>
+                <button
+                    className={`tab-btn ${activeTab === 'popup' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('popup')}
+                >
+                    <Bell size={18} />
+                    <span>首页弹窗</span>
+                </button>
             </div>
-            <div className="section-body">
-                <div className="form-group">
-                    <label>选择模型</label>
-                    <div className="radio-group">
-                        {Object.entries(aiPresets).map(([key, preset]) => (
-                            <label key={key} className="radio-label">
+
+            {/* AI 模型配置内容 */}
+            {activeTab === 'ai' && (
+                <div className="settings-tab-content">
+                    <div className="settings-card">
+                        <div className="section-header">
+                            <Bot size={20} />
+                            <h3>AI 模型配置</h3>
+                        </div>
+                        <div className="section-body">
+                            <div className="form-group">
+                                <label>选择模型</label>
+                                <div className="radio-group">
+                                    {Object.entries(aiPresets).map(([key, preset]) => (
+                                        <label key={key} className="radio-label">
+                                            <input
+                                                type="radio"
+                                                name="ai_provider"
+                                                value={key}
+                                                checked={aiSettings.provider === key}
+                                                onChange={() => onAiPresetChange(key)}
+                                            />
+                                            <span>{preset.name}</span>
+                                        </label>
+                                    ))}
+                                    <label className="radio-label">
+                                        <input
+                                            type="radio"
+                                            name="ai_provider"
+                                            value="custom"
+                                            checked={aiSettings.provider === 'custom'}
+                                            onChange={() => onAiChange('provider', 'custom')}
+                                        />
+                                        <span>自定义</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>API URL</label>
                                 <input
-                                    type="radio"
-                                    name="ai_provider"
-                                    value={key}
-                                    checked={aiSettings.provider === key}
-                                    onChange={() => onAiPresetChange(key)}
+                                    type="text"
+                                    placeholder="例如：https://api.deepseek.com/v1/chat/completions"
+                                    value={aiSettings.api_url}
+                                    onChange={(e) => onAiChange('api_url', e.target.value)}
                                 />
-                                <span>{preset.name}</span>
-                            </label>
-                        ))}
-                        <label className="radio-label">
-                            <input
-                                type="radio"
-                                name="ai_provider"
-                                value="custom"
-                                checked={aiSettings.provider === 'custom'}
-                                onChange={() => onAiChange('provider', 'custom')}
-                            />
-                            <span>自定义</span>
-                        </label>
+                            </div>
+                            <div className="form-group">
+                                <label>API Key</label>
+                                <input
+                                    type="password"
+                                    placeholder="输入 API Key"
+                                    value={aiSettings.api_key}
+                                    onChange={(e) => onAiChange('api_key', e.target.value)}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>模型名称</label>
+                                <input
+                                    type="text"
+                                    placeholder="例如：deepseek-chat"
+                                    value={aiSettings.model_name}
+                                    onChange={(e) => onAiChange('model_name', e.target.value)}
+                                />
+                            </div>
+                            <div className="form-group checkbox-group">
+                                <label className="checkbox-label">
+                                    <input
+                                        type="checkbox"
+                                        checked={aiSettings.skip_ssl_verify}
+                                        onChange={(e) => onAiChange('skip_ssl_verify', e.target.checked)}
+                                    />
+                                    <Shield size={16} />
+                                    <span>忽略 SSL 证书验证（内网自建模型可能需要）</span>
+                                </label>
+                            </div>
+                            <div className="card-footer">
+                                <button className="btn-primary full-width" onClick={onAiSave} disabled={aiSaving}>
+                                    <Save size={16} />
+                                    {aiSaving ? '保存中...' : '保存 AI 配置'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div className="form-group">
-                    <label>API URL</label>
-                    <input
-                        type="text"
-                        placeholder="例如：https://api.deepseek.com/v1/chat/completions"
-                        value={aiSettings.api_url}
-                        onChange={(e) => onAiChange('api_url', e.target.value)}
-                    />
-                </div>
-                <div className="form-group">
-                    <label>API Key</label>
-                    <input
-                        type="password"
-                        placeholder="输入 API Key"
-                        value={aiSettings.api_key}
-                        onChange={(e) => onAiChange('api_key', e.target.value)}
-                    />
-                </div>
-                <div className="form-group">
-                    <label>模型名称</label>
-                    <input
-                        type="text"
-                        placeholder="例如：deepseek-chat"
-                        value={aiSettings.model_name}
-                        onChange={(e) => onAiChange('model_name', e.target.value)}
-                    />
-                </div>
-                <div className="form-group checkbox-group">
-                    <label className="checkbox-label">
-                        <input
-                            type="checkbox"
-                            checked={aiSettings.skip_ssl_verify}
-                            onChange={(e) => onAiChange('skip_ssl_verify', e.target.checked)}
-                        />
-                        <Shield size={16} />
-                        <span>忽略 SSL 证书验证（内网自建模型可能需要）</span>
-                    </label>
-                </div>
-                <button className="btn-primary" onClick={onAiSave} disabled={aiSaving}>
-                    <Save size={16} />
-                    {aiSaving ? '保存中...' : '保存 AI 配置'}
-                </button>
-            </div>
-        </div>
+            )}
 
-        {/* 分隔线 */}
-        <hr className="settings-divider" />
+            {/* IP 访问控制内容 */}
+            {activeTab === 'ip' && (
+                <div className="settings-tab-content">
+                    <div className="settings-card">
+                        <div className="section-header">
+                            <Network size={20} />
+                            <h3>IP 访问控制</h3>
+                        </div>
+                        <div className="section-body">
+                            {/* AI 问法 IP 限制 */}
+                            <div className="ip-control-group">
+                                <div className="ip-control-header">
+                                    <span className="ip-control-title">AI 问法</span>
+                                    <button
+                                        className={`toggle-switch small ${ipAccessSettings.ai_enabled ? 'active' : ''}`}
+                                        onClick={() => onIpAccessChange('ai_enabled', !ipAccessSettings.ai_enabled)}
+                                    >
+                                        {ipAccessSettings.ai_enabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                                        <span>{ipAccessSettings.ai_enabled ? '已开启' : '已关闭'}</span>
+                                    </button>
+                                </div>
+                                {ipAccessSettings.ai_enabled && (
+                                    <div className="form-group">
+                                        <label>IP 白名单（CIDR 格式，每行一个）</label>
+                                        <textarea
+                                            placeholder="例如：192.168.1.0/24&#10;10.0.0.0/8"
+                                            value={ipAccessSettings.ai_whitelist?.join('\n') || ''}
+                                            onChange={(e) => onIpWhitelistChange('ai_whitelist', e.target.value)}
+                                            rows={3}
+                                        />
+                                    </div>
+                                )}
+                            </div>
 
-        {/* 首页弹窗设置 */}
-        <div className="settings-section">
-            <div className="section-header">
-                <Bell size={20} />
-                <h3>首页弹窗设置</h3>
-                <button
-                    className={`toggle-switch ${popupSettings.enabled ? 'active' : ''}`}
-                    onClick={() => onPopupChange('enabled', !popupSettings.enabled)}
-                >
-                    {popupSettings.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-                    <span>{popupSettings.enabled ? '已开启' : '已关闭'}</span>
-                </button>
-            </div>
-            <div className="section-body">
-                <div className="form-group">
-                    <label>弹窗标题</label>
-                    <input
-                        type="text"
-                        placeholder="请输入弹窗标题..."
-                        value={popupSettings.title}
-                        onChange={(e) => onPopupChange('title', e.target.value)}
-                    />
+                            {/* 内部规章 IP 限制 */}
+                            <div className="ip-control-group">
+                                <div className="ip-control-header">
+                                    <span className="ip-control-title">内部规章</span>
+                                    <button
+                                        className={`toggle-switch small ${ipAccessSettings.internal_docs_enabled ? 'active' : ''}`}
+                                        onClick={() => onIpAccessChange('internal_docs_enabled', !ipAccessSettings.internal_docs_enabled)}
+                                    >
+                                        {ipAccessSettings.internal_docs_enabled ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                                        <span>{ipAccessSettings.internal_docs_enabled ? '已开启' : '已关闭'}</span>
+                                    </button>
+                                </div>
+                                {ipAccessSettings.internal_docs_enabled && (
+                                    <div className="form-group">
+                                        <label>IP 白名单（CIDR 格式，每行一个）</label>
+                                        <textarea
+                                            placeholder="例如：192.168.1.0/24&#10;10.0.0.0/8"
+                                            value={ipAccessSettings.internal_docs_whitelist?.join('\n') || ''}
+                                            onChange={(e) => onIpWhitelistChange('internal_docs_whitelist', e.target.value)}
+                                            rows={3}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="card-footer">
+                                <button className="btn-primary full-width" onClick={onIpAccessSave} disabled={ipAccessSaving}>
+                                    <Save size={16} />
+                                    {ipAccessSaving ? '保存中...' : '保存 IP 配置'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="form-group">
-                    <label>弹窗正文</label>
-                    <textarea
-                        placeholder="请输入弹窗内容..."
-                        value={popupSettings.content}
-                        onChange={(e) => onPopupChange('content', e.target.value)}
-                        rows={4}
-                    />
+            )}
+
+            {/* 首页弹窗设置内容 */}
+            {activeTab === 'popup' && (
+                <div className="settings-tab-content">
+                    <div className="settings-card">
+                        <div className="section-header">
+                            <Bell size={20} />
+                            <h3>首页弹窗设置</h3>
+                            <button
+                                className={`toggle-switch ${popupSettings.enabled ? 'active' : ''}`}
+                                onClick={() => onPopupChange('enabled', !popupSettings.enabled)}
+                            >
+                                {popupSettings.enabled ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                                <span>{popupSettings.enabled ? '已开启' : '已关闭'}</span>
+                            </button>
+                        </div>
+                        <div className="section-body">
+                            <div className="form-group">
+                                <label>弹窗标题</label>
+                                <input
+                                    type="text"
+                                    placeholder="请输入弹窗标题..."
+                                    value={popupSettings.title}
+                                    onChange={(e) => onPopupChange('title', e.target.value)}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>弹窗正文</label>
+                                <textarea
+                                    placeholder="请输入弹窗内容..."
+                                    value={popupSettings.content}
+                                    onChange={(e) => onPopupChange('content', e.target.value)}
+                                    rows={4}
+                                />
+                            </div>
+                            <div className="card-footer">
+                                <button className="btn-primary full-width" onClick={onPopupSave} disabled={popupSaving}>
+                                    <Save size={16} />
+                                    {popupSaving ? '保存中...' : '保存设置'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <button className="btn-primary" onClick={onPopupSave} disabled={popupSaving}>
-                    <Save size={16} />
-                    {popupSaving ? '保存中...' : '保存设置'}
-                </button>
-            </div>
+            )}
         </div>
-    </div>
-);
+    );
+};
 
 // ==================== 主组件 ====================
 export default function Admin() {
@@ -373,12 +489,31 @@ export default function Admin() {
     const [aiPresets, setAiPresets] = useState({});
     const [aiSaving, setAiSaving] = useState(false);
 
+    // IP 访问控制配置状态
+    const [ipAccessSettings, setIpAccessSettings] = useState({
+        ai_enabled: false,
+        ai_whitelist: [],
+        internal_docs_enabled: false,
+        internal_docs_whitelist: [],
+    });
+    const [ipAccessSaving, setIpAccessSaving] = useState(false);
+
+    // AI Token 用量统计
+    const [tokenUsage, setTokenUsage] = useState({
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0,
+        call_count: 0,
+    });
+
     useEffect(() => {
         fetchLaws();
         fetchPopupSettings();
         fetchTodayViews();
         fetchTotalViews();
         fetchAiSettings();
+        fetchIpAccessSettings();
+        fetchTokenUsage();
     }, []);
 
     const fetchLaws = async () => {
@@ -487,6 +622,54 @@ export default function Admin() {
         }
     };
 
+    // IP 访问控制相关函数
+    const fetchIpAccessSettings = async () => {
+        try {
+            const settings = await getIpAccessSettings();
+            setIpAccessSettings(settings);
+        } catch (error) {
+            console.error('加载 IP 访问控制配置失败:', error);
+        }
+    };
+
+    // AI Token 用量统计
+    const fetchTokenUsage = async () => {
+        try {
+            const data = await getAiTokenUsage();
+            setTokenUsage(data);
+        } catch (error) {
+            console.error('加载 AI Token 用量失败:', error);
+        }
+    };
+
+    const handleIpAccessChange = (field, value) => {
+        setIpAccessSettings(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleIpWhitelistChange = (field, value) => {
+        // 将逗号或换行分隔的字符串转换为数组
+        const list = value.split(/[,\n]/).map(ip => ip.trim()).filter(ip => ip);
+        setIpAccessSettings(prev => ({ ...prev, [field]: list }));
+    };
+
+    const handleSaveIpAccess = async () => {
+        const hasAiWhitelist = ipAccessSettings.ai_whitelist && ipAccessSettings.ai_whitelist.length > 0;
+        const hasInternalWhitelist = ipAccessSettings.internal_docs_whitelist && ipAccessSettings.internal_docs_whitelist.length > 0;
+        if ((ipAccessSettings.ai_enabled && !hasAiWhitelist) || (ipAccessSettings.internal_docs_enabled && !hasInternalWhitelist)) {
+            message.error('开启访问控制时必须配置 IP 白名单');
+            return;
+        }
+        setIpAccessSaving(true);
+        try {
+            await updateIpAccessSettings(ipAccessSettings);
+            message.success('IP 访问控制配置已保存');
+        } catch (error) {
+            message.error('保存失败');
+        } finally {
+            setIpAccessSaving(false);
+        }
+    };
+
     const openEditModal = (law) => {
         setEditingLaw(law);
         setEditForm({
@@ -591,7 +774,7 @@ export default function Admin() {
 
                 {/* 内容区 */}
                 <main className="admin-main">
-                    {activeTab === 'dashboard' && <DashboardModule laws={laws} todayViews={todayViews} totalViews={totalViews} />}
+                    {activeTab === 'dashboard' && <DashboardModule laws={laws} todayViews={todayViews} totalViews={totalViews} tokenUsage={tokenUsage} />}
                     {activeTab === 'laws' && (
                         <LawsModule
                             laws={laws}
@@ -612,6 +795,11 @@ export default function Admin() {
                             onAiPresetChange={handleAiPresetChange}
                             onAiSave={handleSaveAi}
                             aiSaving={aiSaving}
+                            ipAccessSettings={ipAccessSettings}
+                            onIpAccessChange={handleIpAccessChange}
+                            onIpWhitelistChange={handleIpWhitelistChange}
+                            onIpAccessSave={handleSaveIpAccess}
+                            ipAccessSaving={ipAccessSaving}
                         />
                     )}
                 </main>

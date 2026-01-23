@@ -249,3 +249,42 @@ export const getAiPresets = () => {
 export const updateAiSettings = (data) => {
     return apiClient.put('/settings/ai', data);
 };
+
+/**
+ * 获取 AI Token 累计使用量
+ */
+export const getAiTokenUsage = () => {
+    return apiClient.get('/settings/ai/token-usage');
+};
+
+// ==================== IP 访问控制相关 API ====================
+
+/**
+ * 获取 IP 访问控制配置
+ */
+export const getIpAccessSettings = () => {
+    return apiClient.get('/settings/ip-access');
+};
+
+/**
+ * 更新 IP 访问控制配置
+ */
+export const updateIpAccessSettings = (data) => {
+    return apiClient.put('/settings/ip-access', data);
+};
+
+// ==================== 内部规章相关 API ====================
+
+/**
+ * 检查是否有内部规章数据
+ */
+export const checkInternalDocs = () => {
+    return apiClient.get('/laws/internal-docs/check');
+};
+
+/**
+ * 获取内部规章列表
+ */
+export const getInternalDocsList = (page = 1, pageSize = 20) => {
+    return apiClient.get(`/laws/internal-docs/list?page=${page}&page_size=${pageSize}`);
+};

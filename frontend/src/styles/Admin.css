@@ -1047,15 +1047,131 @@
 
 /* ==================== AI 配置设置样式 ==================== */
 .settings-divider {
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    margin: 1.5rem 0;
+    display: none;
 }
 
+/* ==================== 系统设置 - 标签页布局 ==================== */
+/* 容器调整 */
+.settings-module {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* 标签导航栏 */
+.settings-tabs-header {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 1px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.settings-tabs-header::-webkit-scrollbar {
+    display: none;
+}
+
+/* 标签按钮 */
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    position: relative;
+}
+
+.tab-btn:hover {
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.tab-btn.active {
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.tab-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #3b82f6;
+    border-radius: 2px 2px 0 0;
+}
+
+/* 标签内容区域动画 */
+.settings-tab-content {
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Settings Card 样式（适配单卡片显示） */
+.settings-card {
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: 0 !important;
+}
+
+.settings-card .section-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(15, 23, 42, 0.4);
+    margin-bottom: 0;
+}
+
+.settings-card .section-body {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.settings-card .card-footer {
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(15, 23, 42, 0.2);
+    margin-top: auto;
+}
+
+.btn-primary.full-width {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+/* ==================== 表单组件样式优化 ==================== */
 .radio-group {
     display: flex;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-top: 0.5rem;
 }
 
@@ -1064,12 +1180,16 @@
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    padding: 10px 16px;
+    padding: 8px 12px;
     background: rgba(15, 23, 42, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     transition: all 0.2s;
     color: #94a3b8;
+    font-size: 13px;
+    flex: 1;
+    min-width: 110px;
+    justify-content: center;
 }
 
 .radio-label:hover {
@@ -1078,8 +1198,8 @@
 }
 
 .radio-label input[type="radio"] {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     accent-color: #3b82f6;
 }
 
@@ -1095,25 +1215,27 @@
 .checkbox-label {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     cursor: pointer;
-    padding: 10px 16px;
+    padding: 10px 14px;
     background: rgba(245, 158, 11, 0.08);
     border: 1px solid rgba(245, 158, 11, 0.2);
     border-radius: 8px;
+    color: #f59e0b;
     transition: all 0.2s;
-    color: #fbbf24;
     font-size: 13px;
+    line-height: 1.4;
 }
 
 .checkbox-label:hover {
-    background: rgba(245, 158, 11, 0.12);
+    background: rgba(245, 158, 11, 0.15);
 }
 
 .checkbox-label input[type="checkbox"] {
     width: 16px;
     height: 16px;
     accent-color: #f59e0b;
+    flex-shrink: 0;
 }
 
 .form-group textarea {
@@ -1126,6 +1248,7 @@
     transition: all 0.2s;
     resize: vertical;
     font-family: inherit;
+    min-height: 80px;
 }
 
 .form-group textarea:hover {
@@ -1136,4 +1259,49 @@
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* ==================== IP 访问控制样式 ==================== */
+.ip-control-group {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0;
+}
+
+.ip-control-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.ip-control-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #cbd5e1;
+}
+
+.toggle-switch.small {
+    padding: 2px 4px;
+    font-size: 12px;
+    height: 24px;
+    min-width: 60px;
+}
+
+.toggle-switch.small svg {
+    width: 16px;
+    height: 16px;
+}
+
+.ip-control-group .form-group {
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+.ip-control-group textarea {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    background: rgba(10, 15, 25, 0.6);
 }

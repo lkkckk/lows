@@ -2,8 +2,8 @@
 系统设置 API - 包含首页弹窗、AI模型配置等
 """
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from app.db import get_database
 from .auth import verify_admin
 
@@ -122,4 +122,89 @@ async def update_ai_settings(data: AISettings, _admin: bool = Depends(verify_adm
         upsert=True,
     )
     return {"success": True, "message": "AI 配置已保存"}
+
+
+# ==================== AI Token 用量统计 ====================
+
+@router.get("/ai/token-usage")
+async def get_ai_token_usage():
+    """获取 AI Token 累计使用量"""
+    db = get_database()
+    settings = await db.settings.find_one({"key": "ai_token_usage"})
+    if settings:
+        return {
+            "prompt_tokens": settings.get("prompt_tokens", 0),
+            "completion_tokens": settings.get("completion_tokens", 0),
+            "total_tokens": settings.get("total_tokens", 0),
+            "call_count": settings.get("call_count", 0),
+        }
+    return {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "call_count": 0,
+    }
+
+
+# ==================== IP 访问控制配置 ====================
+
+class IPAccessSettings(BaseModel):
+    """IP 访问控制配置"""
+    ai_enabled: bool = False
+    ai_whitelist: List[str] = Field(default_factory=list)
+    internal_docs_enabled: bool = False
+    internal_docs_whitelist: List[str] = Field(default_factory=list)
+
+
+@router.get("/ip-access")
+async def get_ip_access_settings():
+    """获取 IP 访问控制配置"""
+    db = get_database()
+    settings = await db.settings.find_one({"key": "ip_access_config"})
+    if settings:
+        return {
+            "ai_enabled": settings.get("ai_enabled", False),
+            "ai_whitelist": settings.get("ai_whitelist", []),
+            "internal_docs_enabled": settings.get("internal_docs_enabled", False),
+            "internal_docs_whitelist": settings.get("internal_docs_whitelist", []),
+        }
+    return {
+        "ai_enabled": False,
+        "ai_whitelist": [],
+        "internal_docs_enabled": False,
+        "internal_docs_whitelist": [],
+    }
+
+
+@router.put("/ip-access")
+async def update_ip_access_settings(data: IPAccessSettings, _admin: bool = Depends(verify_admin)):
+    """更新 IP 访问控制配置"""
+    ai_whitelist = [
+        item.strip()
+        for item in data.ai_whitelist
+        if isinstance(item, str) and item.strip()
+    ]
+    internal_docs_whitelist = [
+        item.strip()
+        for item in data.internal_docs_whitelist
+        if isinstance(item, str) and item.strip()
+    ]
+    if data.ai_enabled and not ai_whitelist:
+        raise HTTPException(status_code=400, detail="开启 AI 访问控制时必须配置 IP 白名单")
+    if data.internal_docs_enabled and not internal_docs_whitelist:
+        raise HTTPException(status_code=400, detail="开启内部规章访问控制时必须配置 IP 白名单")
+    db = get_database()
+    await db.settings.update_one(
+        {"key": "ip_access_config"},
+        {
+            "$set": {
+                "ai_enabled": data.ai_enabled,
+                "ai_whitelist": ai_whitelist,
+                "internal_docs_enabled": data.internal_docs_enabled,
+                "internal_docs_whitelist": internal_docs_whitelist,
+            }
+        },
+        upsert=True,
+    )
+    return {"success": True, "message": "IP 访问控制配置已保存"}
 

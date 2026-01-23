@@ -1,12 +1,13 @@
 """
 AI 问法 API 路由
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional, List
 
 from app.services.ai_service import chat_with_ai
 from app.db import get_database
+from .ip_filter import verify_ai_access
 
 router = APIRouter(prefix="/ai", tags=["AI 问法"])
 
@@ -29,30 +30,52 @@ class ChatResponse(BaseModel):
     success: bool = True
 
 
+async def record_token_usage(db, usage: dict):
+    """记录 Token 使用量到数据库"""
+    if not usage or usage.get("total_tokens", 0) == 0:
+        return
+    
+    await db.settings.update_one(
+        {"key": "ai_token_usage"},
+        {
+            "$inc": {
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+                "call_count": 1,
+            }
+        },
+        upsert=True,
+    )
+
+
 @router.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: Request, chat_request: ChatRequest, _ip_check: bool = Depends(verify_ai_access)):
     """
     与 AI 法律助手对话
     
     - **message**: 用户问题
     - **history**: 对话历史（可选）
     """
-    if not request.message.strip():
+    if not chat_request.message.strip():
         raise HTTPException(status_code=400, detail="消息不能为空")
     
     try:
         # 转换历史记录格式
         history = None
-        if request.history:
-            history = [{"role": msg.role, "content": msg.content} for msg in request.history]
+        if chat_request.history:
+            history = [{"role": msg.role, "content": msg.content} for msg in chat_request.history]
         
         # 获取数据库连接
         db = get_database()
         
         # 调用 AI 服务（传递数据库以读取配置）
-        reply = await chat_with_ai(request.message, history, db)
+        result = await chat_with_ai(chat_request.message, history, db)
         
-        return ChatResponse(reply=reply, success=True)
+        # 记录 Token 使用量
+        await record_token_usage(db, result.get("usage", {}))
+        
+        return ChatResponse(reply=result["reply"], success=True)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

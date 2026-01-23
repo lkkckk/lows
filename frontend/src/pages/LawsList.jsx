@@ -9,8 +9,9 @@ import {
     Zap,
     Book,
     X,
+    TrendingUp,
 } from 'lucide-react';
-import { getLawsList, getLawCategories, getPopupSettings } from '../services/api';
+import { getLawsList, getLawCategories, getPopupSettings, getTodayViews, getTotalViews } from '../services/api';
 
 // 法规卡片组件
 const LawCard = ({ law, onClick }) => (
@@ -76,6 +77,10 @@ export default function LawsList() {
     const [showPopup, setShowPopup] = useState(false);
     const [popupData, setPopupData] = useState({ title: '', content: '' });
 
+    // 网站数据状态
+    const [todayViews, setTodayViews] = useState(0);
+    const [totalViews, setTotalViews] = useState(0);
+
     useEffect(() => {
         const fetchCategories = async () => {
             try {
@@ -107,6 +112,21 @@ export default function LawsList() {
             }
         };
         checkPopup();
+
+        // 加载网站统计数据
+        const fetchStats = async () => {
+            try {
+                const [todayRes, totalRes] = await Promise.all([
+                    getTodayViews(),
+                    getTotalViews()
+                ]);
+                if (todayRes.success) setTodayViews(todayRes.data?.today_views || 0);
+                if (totalRes.success) setTotalViews(totalRes.data?.total_views || 0);
+            } catch (error) {
+                console.error('加载网站数据失败:', error);
+            }
+        };
+        fetchStats();
     }, []);
 
     useEffect(() => {
@@ -214,6 +234,58 @@ export default function LawsList() {
                             <button className="tool-button" onClick={() => navigate('/laws/create')} style={{ marginTop: '0.5rem' }}>
                                 <Shield size={16} /> 录入法规
                             </button>
+                        </div>
+
+                        <div className="tools-section" style={{ marginTop: '1.5rem' }}>
+                            <div className="tools-title">网站数据</div>
+                            <div style={{
+                                background: '#f8fafc',
+                                borderRadius: '8px',
+                                padding: '12px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                border: '1px solid #e2e8f0'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
+                                        <div style={{
+                                            background: '#dbeafe',
+                                            color: '#2563eb',
+                                            padding: '4px',
+                                            borderRadius: '6px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <Zap size={14} />
+                                        </div>
+                                        <span>总浏览量</span>
+                                    </div>
+                                    <span style={{ fontWeight: '600', color: '#1e293b', fontFamily: 'monospace', fontSize: '14px' }}>
+                                        {totalViews.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#64748b', fontSize: '13px' }}>
+                                        <div style={{
+                                            background: '#fef3c7',
+                                            color: '#d97706',
+                                            padding: '4px',
+                                            borderRadius: '6px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            <TrendingUp size={14} />
+                                        </div>
+                                        <span>今日浏览</span>
+                                    </div>
+                                    <span style={{ fontWeight: '600', color: '#1e293b', fontFamily: 'monospace', fontSize: '14px' }}>
+                                        {todayViews.toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     </aside>
 
