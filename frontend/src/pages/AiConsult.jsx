@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
-import { Send, MessageCircle, Bot, User, Sparkles, Trash2 } from 'lucide-react';
+import { Send, MessageCircle, Bot, User, Sparkles, Trash2, Copy, Check } from 'lucide-react';
 import { sendAiMessage } from '../services/api';
 import './AiConsult.css';
 
@@ -44,8 +44,21 @@ export default function AiConsult() {
     const [messages, setMessages] = useState(loadMessages);
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
+    const [copiedIndex, setCopiedIndex] = useState(null);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
+
+    // 复制消息内容
+    const handleCopy = async (content, index) => {
+        try {
+            await navigator.clipboard.writeText(content);
+            setCopiedIndex(index);
+            message.success('已复制到剪贴板');
+            setTimeout(() => setCopiedIndex(null), 2000);
+        } catch (err) {
+            message.error('复制失败');
+        }
+    };
 
     // 消息变化时保存到 sessionStorage
     useEffect(() => {
@@ -123,11 +136,11 @@ export default function AiConsult() {
             <section className="ai-hero">
                 <div className="ai-hero-content">
                     <div className="ai-hero-header">
-                        <Sparkles size={36} color="#a78bfa" />
+                        <Sparkles size={24} color="#a78bfa" />
                         <h1>AI 法律问答</h1>
                     </div>
                     <p className="ai-hero-subtitle">
-                        基于 AI 大模型的智能法律助手，可解答法律相关问题，回答仅供参考
+                        请注意！！！AI对法律法规的理解容易出现偏差，引用时请务必进行核对
                     </p>
                 </div>
             </section>
@@ -149,6 +162,17 @@ export default function AiConsult() {
                                 <div className="message-bubble">
                                     {msg.content}
                                 </div>
+                                <button
+                                    className="copy-btn"
+                                    onClick={() => handleCopy(msg.content, index)}
+                                    title="复制内容"
+                                >
+                                    {copiedIndex === index ? (
+                                        <><Check size={14} /> 已复制</>
+                                    ) : (
+                                        <><Copy size={14} /> 复制</>
+                                    )}
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -190,7 +214,7 @@ export default function AiConsult() {
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyDown={handleKeyDown}
                             disabled={loading}
-                            rows={1}
+                            rows={2}
                         />
                         <button
                             className="send-btn"

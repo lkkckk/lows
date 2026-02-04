@@ -11,7 +11,7 @@
 .ai-hero {
     background: linear-gradient(135deg, rgba(167, 139, 250, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
     border-bottom: 1px solid rgba(167, 139, 250, 0.2);
-    padding: 40px 20px;
+    padding: 16px 20px;
     text-align: center;
 }
 
@@ -24,12 +24,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 12px;
+    margin-bottom: 8px;
 }
 
 .ai-hero-header h1 {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 700;
     background: linear-gradient(135deg, #a78bfa 0%, #818cf8 100%);
     -webkit-background-clip: text;
@@ -39,9 +39,11 @@
 }
 
 .ai-hero-subtitle {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.95rem;
+    color: #fbbf24;
+    font-size: 1rem;
+    font-weight: 600;
     margin: 0;
+    text-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
 }
 
 /* 聊天容器 */
@@ -53,7 +55,8 @@
     width: 100%;
     margin: 0 auto;
     padding: 20px;
-    gap: 20px;
+    padding-bottom: 5px;
+    gap: 25px;
 }
 
 /* 消息区域 */
@@ -65,7 +68,7 @@
     gap: 20px;
     padding: 20px 0;
     min-height: 400px;
-    max-height: calc(100vh - 380px);
+    max-height: calc(100vh - 320px);
 }
 
 /* 单条消息 */
@@ -137,6 +140,39 @@
     border-radius: 18px 18px 4px 18px;
 }
 
+/* 复制按钮 */
+.copy-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.message-content:hover .copy-btn {
+    opacity: 1;
+    visibility: visible;
+}
+
+.copy-btn:hover {
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.message.user .copy-btn {
+    margin-left: auto;
+}
+
 /* 加载动画 */
 .message-bubble.loading {
     display: flex;
@@ -191,9 +227,10 @@
     gap: 12px;
     background: rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 8px 12px;
+    padding: 12px 16px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     transition: border-color 0.3s, box-shadow 0.3s;
+    align-items: flex-end;
 }
 
 .input-wrapper:focus-within {
@@ -209,7 +246,8 @@
     color: white;
     font-size: 0.95rem;
     resize: none;
-    max-height: 120px;
+    min-height: 48px;
+    max-height: 150px;
     line-height: 1.5;
 }
 

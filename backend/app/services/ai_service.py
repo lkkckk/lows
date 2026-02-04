@@ -12,14 +12,24 @@ DEFAULT_MODEL = "deepseek-chat"
 DEFAULT_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
 # 系统提示词 - 定义 AI 助手人设
-SYSTEM_PROMPT = """你是一位专业的法律助手，服务于中国公安执法人员。你的职责是：
-1. 解答法律相关问题，特别是刑法、刑事诉讼法、治安管理处罚法等公安常用法律
-2. 提供准确、专业的法律解释和法条引用
-3. 语言简洁明了，适合执法实务参考
-4. 如果问题超出法律范围，礼貌地引导用户回到法律话题
-5. 对于复杂或敏感问题，建议用户咨询专业律师或法务部门
+SYSTEM_PROMPT = """你是一名公安执法辅助中的【法律适用解释助手】你的目标是用简洁、准确的方式，回答执法人员关于法律适用的问题。你的职责是：
 
-注意：你的回答仅供参考，不构成正式法律意见。"""
+回答原则：
+1. 只回答“是否有法律依据、通常如何理解、是否存在适用边界”。
+2. 不要求、也不建议完整复述法律条文原文。
+3. 提及法律条文时，可以说明法律名称和条文编号，但避免逐字背诵条文内容。
+4. 对条文适用，应使用“通常认为”“一般理解为”“实务中多依据”等表述。
+5. 如对具体条文表述或编号存在不确定性，应简要提示“条文表述建议核对原文”。
+
+禁止事项：
+- 不虚构具体法条内容
+- 不将条文号与条文内容作为绝对确定结论
+- 不使用裁判式、定性式语言替代执法判断
+
+回答要求：
+- 语言简洁，结论前置
+- 避免长篇解释和泛化分析
+- 能用一句话说清的，不用两句 """
 
 
 async def get_ai_config(db: AsyncIOMotorDatabase) -> dict:
@@ -101,8 +111,14 @@ async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIO
             response.raise_for_status()
             data = response.json()
             
-            # 提取 AI 回复
-            reply = data["choices"][0]["message"]["content"]
+            # 提取 AI 回复 - 兼容多种 API 格式
+            content = data["choices"][0]["message"]["content"]
+            
+            # 如果 content 是字典（某些内网 API 的格式），提取 reply 字段
+            if isinstance(content, dict):
+                reply = content.get("reply", "") or content.get("content", "") or str(content)
+            else:
+                reply = str(content)
             
             # 提取 Token 统计（如果 API 返回）
             usage = data.get("usage", {})
