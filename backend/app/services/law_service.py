@@ -806,6 +806,17 @@ class LawService:
         regex_query = {"content": {"$regex": query, "$options": "i"}}
         cursor = self.articles_collection.find(regex_query).sort("article_num", 1).limit(top_k)
         articles = await cursor.to_list(length=top_k)
+        
+        # 如果精确匹配失败，尝试拆分关键词单独搜索
+        if not articles and len(query) > 2:
+            # 尝试用查询中的关键词（去掉常见后缀如"处罚""规定""条款"等）
+            import re
+            clean_query = re.sub(r'(处罚|规定|条款|法律|法规|如何|怎么|什么|相关)$', '', query).strip()
+            if clean_query and clean_query != query:
+                regex_query = {"content": {"$regex": clean_query, "$options": "i"}}
+                cursor = self.articles_collection.find(regex_query).sort("article_num", 1).limit(top_k)
+                articles = await cursor.to_list(length=top_k)
+        
         if not articles:
             return []
 

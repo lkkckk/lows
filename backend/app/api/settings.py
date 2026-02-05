@@ -26,6 +26,7 @@ class AISettings(BaseModel):
     skip_ssl_verify: bool = False
     rag_enabled: bool = True
     rag_top_k: int = 6
+    use_function_calling: bool = True  # 是否使用 Function Calling
 
 
 # 预设模型配置
@@ -97,6 +98,7 @@ async def get_ai_settings():
             "skip_ssl_verify": settings.get("skip_ssl_verify", False),
             "rag_enabled": settings.get("rag_enabled", True),
             "rag_top_k": settings.get("rag_top_k", 6),
+            "use_function_calling": settings.get("use_function_calling", True),
         }
     # 返回默认配置
     return {
@@ -107,6 +109,7 @@ async def get_ai_settings():
         "skip_ssl_verify": False,
         "rag_enabled": True,
         "rag_top_k": 6,
+        "use_function_calling": True,
     }
 
 
@@ -131,6 +134,7 @@ async def update_ai_settings(data: AISettings, _admin: bool = Depends(verify_adm
                 "skip_ssl_verify": data.skip_ssl_verify,
                 "rag_enabled": data.rag_enabled,
                 "rag_top_k": data.rag_top_k,
+                "use_function_calling": data.use_function_calling,
             }
         },
         upsert=True,
