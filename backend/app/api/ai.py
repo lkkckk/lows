@@ -22,12 +22,16 @@ class ChatRequest(BaseModel):
     """聊天请求模型"""
     message: str
     history: Optional[List[ChatMessage]] = None
+    use_rag: bool = True
+    rag_top_k: Optional[int] = None
 
 
 class ChatResponse(BaseModel):
     """聊天响应模型"""
     reply: str
     success: bool = True
+    provider: Optional[str] = None
+    sources: Optional[List[dict]] = None
 
 
 async def record_token_usage(db, usage: dict):
@@ -70,12 +74,23 @@ async def chat(request: Request, chat_request: ChatRequest, _ip_check: bool = De
         db = get_database()
         
         # 调用 AI 服务（传递数据库以读取配置）
-        result = await chat_with_ai(chat_request.message, history, db)
+        result = await chat_with_ai(
+            chat_request.message,
+            history,
+            db,
+            use_rag=chat_request.use_rag,
+            rag_top_k=chat_request.rag_top_k,
+        )
         
         # 记录 Token 使用量
         await record_token_usage(db, result.get("usage", {}))
         
-        return ChatResponse(reply=result["reply"], success=True)
+        return ChatResponse(
+            reply=result["reply"],
+            success=True,
+            provider=result.get("provider"),
+            sources=result.get("sources"),
+        )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

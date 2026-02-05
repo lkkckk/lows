@@ -24,6 +24,8 @@ class AISettings(BaseModel):
     api_key: str = ""
     model_name: str = "deepseek-chat"
     skip_ssl_verify: bool = False
+    rag_enabled: bool = True
+    rag_top_k: int = 6
 
 
 # 预设模型配置
@@ -38,6 +40,12 @@ AI_PRESETS = {
         "name": "锐智AI (内网)",
         "api_url": "https://10.2.164.106/v2/chat/completions",
         "model_name": "ayenaspring-pro-001",
+        "skip_ssl_verify": True,
+    },
+    "qwen": {
+        "name": "Qwen (内网)",
+        "api_url": "http://127.0.0.1:8000/v1/chat/completions",
+        "model_name": "qwen2.5",
         "skip_ssl_verify": True,
     },
 }
@@ -87,6 +95,8 @@ async def get_ai_settings():
             "api_key": settings.get("api_key", ""),
             "model_name": settings.get("model_name", ""),
             "skip_ssl_verify": settings.get("skip_ssl_verify", False),
+            "rag_enabled": settings.get("rag_enabled", True),
+            "rag_top_k": settings.get("rag_top_k", 6),
         }
     # 返回默认配置
     return {
@@ -95,6 +105,8 @@ async def get_ai_settings():
         "api_key": "",
         "model_name": AI_PRESETS["deepseek"]["model_name"],
         "skip_ssl_verify": False,
+        "rag_enabled": True,
+        "rag_top_k": 6,
     }
 
 
@@ -117,6 +129,8 @@ async def update_ai_settings(data: AISettings, _admin: bool = Depends(verify_adm
                 "api_key": data.api_key,
                 "model_name": data.model_name,
                 "skip_ssl_verify": data.skip_ssl_verify,
+                "rag_enabled": data.rag_enabled,
+                "rag_top_k": data.rag_top_k,
             }
         },
         upsert=True,

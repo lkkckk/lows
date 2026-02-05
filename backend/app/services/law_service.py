@@ -89,15 +89,41 @@ def _resolve_law_alias(keyword: str) -> str:
 
 
 def get_law_weight(title: str) -> int:
-    """根据法律标题获取权重"""
+    """根据法律标题获取权重
+    
+    排序规则：
+    1. 精确匹配的核心法律权重最高
+    2. 包含核心法律关键词的次之
+    3. 解释、规定、意见、通知等配套文件降权
+    4. 其他默认权重
+    """
+    base_weight = DEFAULT_WEIGHT
+    
     # 精确匹配
     if title in LAW_WEIGHT_CONFIG:
-        return LAW_WEIGHT_CONFIG[title]
-    # 模糊匹配（包含关键词）
-    for key, weight in LAW_WEIGHT_CONFIG.items():
-        if key in title:
-            return weight
-    return DEFAULT_WEIGHT
+        base_weight = LAW_WEIGHT_CONFIG[title]
+    else:
+        # 模糊匹配（包含关键词）
+        for key, weight in LAW_WEIGHT_CONFIG.items():
+            if key in title:
+                base_weight = weight
+                break
+    
+    # 配套文件降权（解释、规定、意见、通知、批复、答复、决定等）
+    # 这些文件虽然可能包含核心法律名称，但应该排在正法之后
+    SUPPLEMENTARY_KEYWORDS = [
+        "解释", "规定", "意见", "通知", "批复", "答复", 
+        "决定", "办法", "细则", "条例", "规则", "指引",
+        "纪要", "复函", "函", "公告"
+    ]
+    
+    for keyword in SUPPLEMENTARY_KEYWORDS:
+        if keyword in title:
+            # 降低权重，但仍保持相对排序
+            base_weight = max(base_weight - 20, 1)
+            break
+    
+    return base_weight
 
 
 class LawService:
@@ -263,7 +289,7 @@ class LawService:
         return articles
 
     async def get_article_by_number(
-        self, law_id: str, article_num: int
+        self, law_id: str, article_num: int, sub_index: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         根据条号获取条文
@@ -271,7 +297,14 @@ class LawService:
         """
         # 将阿拉伯数字转换为中文数字
         chinese_num = self._arabic_to_chinese(article_num)
-        display_pattern = f"^第{chinese_num}条"
+        # 如果有子条目，匹配 "第XX条之Y"，否则匹配 "第XX条" (且后面没有"之")
+        if sub_index:
+             display_pattern = f"^第{chinese_num}条{sub_index}"
+        else:
+             # Negative lookahead ensuring "第XX条" is not followed by "之"
+             # e.g. match "第十八条", but not "第十八条之一"
+             # Regex: ^第十八条(?!之)
+             display_pattern = f"^第{chinese_num}条(?!之)"
         
         article = await self.articles_collection.find_one({
             "law_id": law_id,
@@ -320,12 +353,14 @@ class LawService:
         else:
             return str(num)  # 超过999直接返回数字
 
-    def parse_article_input(self, input_str: str) -> Optional[int]:
+    def parse_article_input(self, input_str: str) -> tuple[Optional[int], Optional[str]]:
         """
         解析条号输入，支持多种格式：
-        - "第八十三条" → 83
-        - "83条" → 83
-        - "83" → 83
+        - "第八十三条" → (83, None)
+        - "第八十三条之一" → (83, "之一")
+        - "83条" → (83, None)
+        - "83" → (83, None)
+        返回: (article_num, sub_index)
         """
         # 中文数字映射
         chinese_num_map = {
@@ -334,25 +369,26 @@ class LawService:
             '十': 10, '百': 100, '千': 1000
         }
 
-        # 匹配模式1: 第XX条
-        pattern1 = r'第([零一二三四五六七八九十百千]+)条'
+        # 匹配模式1: 第XX条[之Y]
+        pattern1 = r'第([零一二三四五六七八九十百千]+)条([之][零一二三四五六七八九十]+)?'
         match = re.search(pattern1, input_str)
         if match:
             chinese_num = match.group(1)
-            return self._chinese_to_arabic(chinese_num, chinese_num_map)
+            sub_index = match.group(2) # e.g. "之一"
+            return (self._chinese_to_arabic(chinese_num, chinese_num_map), sub_index)
 
         # 匹配模式2: XX条
         pattern2 = r'(\d+)条'
         match = re.search(pattern2, input_str)
         if match:
-            return int(match.group(1))
+            return (int(match.group(1)), None)
 
         # 匹配模式3: 纯数字
         pattern3 = r'^\d+$'
         if re.match(pattern3, input_str.strip()):
-            return int(input_str.strip())
+            return (int(input_str.strip()), None)
 
-        return None
+        return (None, None)
 
     def _extract_law_keyword(self, query: str) -> str:
         """
@@ -362,8 +398,15 @@ class LawService:
             return ""
 
         cn_nums = "\u96f6\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341\u767e\u5343"
-        text = re.sub(rf"\u7b2c?[{cn_nums}]+\u6761", " ", query)
-        text = re.sub(r"\u7b2c?\d+\u6761", " ", text)
+        # 匹配 "第XX条" 或 "第XX条之Y"
+        text = re.sub(rf"\u7b2c?[{cn_nums}]+\u6761([之][{cn_nums}]+)?", " ", query)
+        text = re.sub(r"\u7b2c?\d+\u6761", " ", text) # 匹配 "XX条"
+        text = re.sub(r"^(请问|问下|问一下|咨询|请教)", "", text)
+        text = re.sub(r"(是什么内容|是什么|是啥|内容|规定|条文|规定内容|的内容|具体内容|主要内容|含义|指什么|什么意思|指啥)$", "", text)
+        text = re.sub(r"[\s\?\uff1f\u3002\uff0c\uff1b\uff1a\u2026]+$", "", text)
+        
+        # Remove common brackets that might wrap the law name
+        text = re.sub(r"[《》<>〈〉（）()\[\]【】]", "", text)
 
         return text.strip()
 
@@ -416,10 +459,12 @@ class LawService:
         ).to_list(length=20)
 
     async def _search_by_law_article(
-        self, query: str, article_num: int, page: int, page_size: int
+        self, query: str, article_num: int, page: int, page_size: int, sub_index: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Search by law name + article number pattern.
+        使用 article_display 字段的正则匹配，而非 article_num 字段。
+        因为 article_num 可能因为"之一"类条文导致序号错乱。
         """
         raw_keyword = self._extract_law_keyword(query)
         if not raw_keyword:
@@ -444,7 +489,23 @@ class LawService:
         law_map = {law["law_id"]: law for law in laws}
         law_ids = list(law_map.keys())
 
-        search_query = {"law_id": {"$in": law_ids}, "article_num": article_num}
+        # 使用 article_display 正则匹配，而非 article_num
+        # 将阿拉伯数字转换为中文数字
+        chinese_num = self._arabic_to_chinese(article_num)
+        
+        # 构建正则表达式
+        if sub_index:
+            # 搜索 "第XX条之Y"
+            display_pattern = f"^第{chinese_num}条{sub_index}"
+        else:
+            # 搜索 "第XX条" 且后面不是 "之"（避免匹配到 "第XX条之一"）
+            display_pattern = f"^第{chinese_num}条(?!之)"
+
+        search_query = {
+            "law_id": {"$in": law_ids},
+            "article_display": {"$regex": display_pattern}
+        }
+
         total = await self.articles_collection.count_documents(search_query)
         total_pages = math.ceil(total / page_size) if total > 0 else 0
         skip = (page - 1) * page_size
@@ -467,6 +528,9 @@ class LawService:
                     article.get("content", ""), normalized
                 ),
             })
+
+        # 按法律权重排序（权重高的排前面）
+        results.sort(key=lambda x: -get_law_weight(x.get("law_title", "")))
 
         return {
             "data": results,
@@ -512,11 +576,11 @@ class LawService:
         2. 如果不是条号，使用正则表达式搜索
         """
         # 先尝试解析为条号
-        article_num = self.parse_article_input(query)
+        article_num, sub_index = self.parse_article_input(query)
 
         if article_num:
             # 按条号精准查询
-            article = await self.get_article_by_number(law_id, article_num)
+            article = await self.get_article_by_number(law_id, article_num, sub_index)
             if article:
                 return {
                     "data": [article],
@@ -571,11 +635,26 @@ class LawService:
         import time
         start_time = time.time()
 
-        article_num = self.parse_article_input(query)
+        article_num, sub_index = self.parse_article_input(query)
         if article_num:
-            article_result = await self._search_by_law_article(query, article_num, page, page_size)
+            # 当用户明确搜索特定条号时（如"刑法第112条"），优先使用精准搜索
+            article_result = await self._search_by_law_article(query, article_num, page, page_size, sub_index)
             if article_result is not None:
+                # 找到法规，返回结果（即使为空，也意味着该条号不存在）
                 return article_result
+            # 如果 _search_by_law_article 返回 None（法规未找到），
+            # 仍然不应该回退到全文搜索，因为那可能返回误导性结果
+            # 例如：搜"刑法第112条"却返回引用了112条的第110条
+            # 返回空结果，让用户知道未找到
+            return {
+                "data": [],
+                "pagination": {
+                    "total": 0,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": 0,
+                }
+            }
 
         search_engine = get_search_engine()
         if search_engine.enabled:
@@ -665,6 +744,93 @@ class LawService:
             snippet = snippet + "..."
 
         return snippet
+
+    async def search_for_rag(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
+        """
+        知识库检索（RAG 专用）：优先规则召回与搜索引擎，必要时降级为文本索引/正则。
+        """
+        if not query or not query.strip():
+            return []
+
+        article_num, sub_index = self.parse_article_input(query)
+        if article_num:
+            article_result = await self._search_by_law_article(query, article_num, 1, top_k, sub_index)
+            if article_result and article_result.get("data"):
+                return article_result["data"]
+
+        search_engine = get_search_engine()
+        if search_engine.enabled:
+            try:
+                engine_result = await search_engine.search_articles(query, 1, top_k)
+                if engine_result and engine_result.get("data"):
+                    return engine_result["data"]
+            except Exception:
+                pass
+
+        pipeline = [
+            {"$match": {"$text": {"$search": query}}},
+            {"$addFields": {"score": {"$meta": "textScore"}}},
+            {"$sort": {"score": -1, "article_num": 1}},
+            {"$limit": top_k},
+            {
+                "$lookup": {
+                    "from": "laws",
+                    "localField": "law_id",
+                    "foreignField": "law_id",
+                    "as": "law_info",
+                }
+            },
+            {"$unwind": {"path": "$law_info", "preserveNullAndEmptyArrays": True}},
+            {
+                "$project": {
+                    "_id": 1,
+                    "law_id": 1,
+                    "law_title": "$law_info.title",
+                    "law_category": "$law_info.category",
+                    "article_num": 1,
+                    "article_display": 1,
+                    "content": 1,
+                    "score": 1,
+                }
+            },
+        ]
+
+        results = await self.articles_collection.aggregate(pipeline).to_list(length=top_k)
+        if results:
+            for result in results:
+                result["_id"] = str(result["_id"])
+                result["highlight"] = self._generate_highlight(result.get("content", ""), query)
+            return results
+
+        regex_query = {"content": {"$regex": query, "$options": "i"}}
+        cursor = self.articles_collection.find(regex_query).sort("article_num", 1).limit(top_k)
+        articles = await cursor.to_list(length=top_k)
+        if not articles:
+            return []
+
+        law_ids = list({article.get("law_id") for article in articles if article.get("law_id")})
+        laws = await self.laws_collection.find(
+            {"law_id": {"$in": law_ids}},
+            {"law_id": 1, "title": 1, "category": 1},
+        ).to_list(length=len(law_ids))
+        law_map = {law["law_id"]: law for law in laws}
+
+        output = []
+        for article in articles:
+            article["_id"] = str(article["_id"])
+            law_info = law_map.get(article.get("law_id"), {})
+            output.append({
+                "law_id": article.get("law_id"),
+                "law_title": law_info.get("title", ""),
+                "law_category": law_info.get("category", ""),
+                "article_num": article.get("article_num"),
+                "article_display": article.get("article_display", ""),
+                "content": article.get("content", ""),
+                "highlight": self._generate_highlight(article.get("content", ""), query),
+                "score": None,
+            })
+
+        return output
 
     async def get_categories(self) -> List[str]:
         """获取所有法规分类（只返回数据库中实际存在的分类）"""

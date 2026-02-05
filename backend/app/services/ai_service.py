@@ -3,8 +3,10 @@ AI 服务模块 - 从数据库读取配置，支持动态切换模型
 """
 import os
 import httpx
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from app.services.knowledge_base_service import KnowledgeBaseService
 
 # 默认配置（当数据库无配置时使用）
 DEFAULT_API_URL = "https://api.deepseek.com/v1/chat/completions"
@@ -41,6 +43,9 @@ async def get_ai_config(db: AsyncIOMotorDatabase) -> dict:
             "api_key": settings.get("api_key", DEFAULT_API_KEY),
             "model_name": settings.get("model_name", DEFAULT_MODEL),
             "skip_ssl_verify": settings.get("skip_ssl_verify", False),
+            "provider": settings.get("provider", "default"),
+            "rag_enabled": settings.get("rag_enabled", True),
+            "rag_top_k": settings.get("rag_top_k", 6),
         }
     # 返回默认配置
     return {
@@ -48,10 +53,41 @@ async def get_ai_config(db: AsyncIOMotorDatabase) -> dict:
         "api_key": DEFAULT_API_KEY,
         "model_name": DEFAULT_MODEL,
         "skip_ssl_verify": False,
+        "provider": "default",
+        "rag_enabled": True,
+        "rag_top_k": 6,
     }
 
 
-async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIOMotorDatabase = None) -> Dict[str, Any]:
+def _build_messages(message: str, history: Optional[list], context: str) -> List[Dict[str, str]]:
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if context:
+        messages.append({
+            "role": "system",
+            "content": "以下为可引用的法规条文摘要：\n"
+            + context
+            + "\n回答时应优先引用上述条文，并给出法名与条号。若未检索到明确依据，请说明需核对原文。",
+        })
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": message})
+    return messages
+
+
+def _extract_reply(data: Dict[str, Any]) -> str:
+    content = data["choices"][0]["message"]["content"]
+    if isinstance(content, dict):
+        return content.get("reply", "") or content.get("content", "") or str(content)
+    return str(content)
+
+
+async def chat_with_ai(
+    message: str,
+    history: Optional[list] = None,
+    db: AsyncIOMotorDatabase = None,
+    use_rag: bool = True,
+    rag_top_k: Optional[int] = None,
+) -> Dict[str, Any]:
     """
     与 AI 进行对话（从数据库读取配置）
     
@@ -74,35 +110,65 @@ async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIO
             "skip_ssl_verify": False,
         }
     
-    api_url = config["api_url"]
-    api_key = config["api_key"]
-    model_name = config["model_name"]
-    skip_ssl_verify = config["skip_ssl_verify"]
-    
-    if not api_key:
-        raise Exception("AI 服务未配置 API Key，请在后台管理页面配置")
-    
-    # 构建消息列表
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    
-    # 添加历史对话（如果有）
-    if history:
-        messages.extend(history)
-    
-    # 添加当前用户消息
-    messages.append({"role": "user", "content": message})
-    
-    # 调用 AI API
-    async with httpx.AsyncClient(timeout=60.0, verify=not skip_ssl_verify) as client:
-        try:
+    rag_enabled = config.get("rag_enabled", True)
+    top_k = rag_top_k if rag_top_k is not None else config.get("rag_top_k", 6)
+    rag_context = ""
+    rag_sources = []
+    direct_answer = ""
+
+    if db is not None and use_rag and rag_enabled:
+        kb_service = KnowledgeBaseService(db)
+        rag_data = await kb_service.retrieve(message, top_k=top_k)
+        rag_context = rag_data.get("context", "")
+        rag_sources = rag_data.get("sources", [])
+        direct_answer = rag_data.get("direct_answer", "")
+
+    if use_rag and rag_enabled and direct_answer:
+        return {
+            "reply": direct_answer,
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+            "provider": "knowledge_base",
+            "sources": rag_sources,
+        }
+
+    if use_rag and rag_enabled and not rag_context:
+        return {
+            "reply": "未检索到明确的法规条文，请核对法规名称或更新知识库。",
+            "usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+            "provider": "knowledge_base",
+            "sources": [],
+        }
+
+    messages = _build_messages(message, history, rag_context)
+
+    api_url = config.get("api_url", DEFAULT_API_URL)
+    if not api_url:
+        raise Exception("AI 服务未配置 API URL，请在后台管理页面配置")
+    api_key = config.get("api_key", DEFAULT_API_KEY) or ""
+    model = config.get("model_name", DEFAULT_MODEL)
+    skip_ssl_verify = config.get("skip_ssl_verify", False)
+    timeout = 60.0
+    provider_id = config.get("provider", "default")
+
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout, verify=not skip_ssl_verify) as client:
             response = await client.post(
                 api_url,
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
                 json={
-                    "model": model_name,
+                    "model": model,
                     "messages": messages,
                     "temperature": 0.7,
                     "max_tokens": 2000,
@@ -110,36 +176,27 @@ async def chat_with_ai(message: str, history: Optional[list] = None, db: AsyncIO
             )
             response.raise_for_status()
             data = response.json()
-            
-            # 提取 AI 回复 - 兼容多种 API 格式
-            content = data["choices"][0]["message"]["content"]
-            
-            # 如果 content 是字典（某些内网 API 的格式），提取 reply 字段
-            if isinstance(content, dict):
-                reply = content.get("reply", "") or content.get("content", "") or str(content)
-            else:
-                reply = str(content)
-            
-            # 提取 Token 统计（如果 API 返回）
-            usage = data.get("usage", {})
-            
-            return {
-                "reply": reply,
-                "usage": {
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
-                    "total_tokens": usage.get("total_tokens", 0),
-                }
-            }
-            
-        except httpx.HTTPStatusError as e:
-            error_msg = f"AI 服务请求失败: {e.response.status_code}"
-            if e.response.status_code == 401:
-                error_msg = "AI 服务认证失败，请检查 API Key 配置"
-            elif e.response.status_code == 429:
-                error_msg = "AI 服务请求频率过高，请稍后重试"
-            raise Exception(error_msg)
-        except httpx.TimeoutException:
-            raise Exception("AI 服务响应超时，请稍后重试")
-        except Exception as e:
-            raise Exception(f"AI 服务出错: {str(e)}")
+
+        reply = _extract_reply(data)
+        usage = data.get("usage", {})
+        return {
+            "reply": reply,
+            "usage": {
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
+                "total_tokens": usage.get("total_tokens", 0),
+            },
+            "provider": provider_id,
+            "sources": rag_sources,
+        }
+    except httpx.HTTPStatusError as e:
+        error_msg = f"AI 服务请求失败: {e.response.status_code}"
+        if e.response.status_code == 401:
+            error_msg = "AI 服务认证失败，请检查 API Key 配置"
+        elif e.response.status_code == 429:
+            error_msg = "AI 服务请求频率过高，请稍后重试"
+        raise Exception(error_msg)
+    except httpx.TimeoutException:
+        raise Exception("AI 服务响应超时，请稍后重试")
+    except Exception as e:
+        raise Exception(f"AI 服务出错: {str(e)}")
