@@ -402,7 +402,8 @@ class LawService:
         text = re.sub(rf"\u7b2c?[{cn_nums}]+\u6761([之][{cn_nums}]+)?", " ", query)
         text = re.sub(r"\u7b2c?\d+\u6761", " ", text) # 匹配 "XX条"
         text = re.sub(r"^(请问|问下|问一下|咨询|请教)", "", text)
-        text = re.sub(r"(是什么内容|是什么|是啥|内容|规定|条文|规定内容|的内容|具体内容|主要内容|含义|指什么|什么意思|指啥)$", "", text)
+        # 去除尾部常见问句：内容是什么、是什么内容、规定是什么、怎么规定的等
+        text = re.sub(r"(的?内容|的?规定|条文|含义|主要内容|具体内容|规定内容)?(是什么|是啥|指什么|什么意思|指啥|怎么规定|怎么说)?[?？。，；：…]*$", "", text)
         text = re.sub(r"[\s\?\uff1f\u3002\uff0c\uff1b\uff1a\u2026]+$", "", text)
         
         # Remove common brackets that might wrap the law name
