@@ -1,0 +1,32 @@
+# 基于轻量级 Python 镜像
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# 1. 替换 APT 源为阿里云 (加速系统包安装)
+# 尝试兼容旧版 sources.list 和新版 debian.sources
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list
+
+# 2. 安装编译依赖 (防止 sentence-transformers 依赖编译失败)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. 设置 pip 镜像加速
+RUN pip config set global.index-url https://mirrors.aliyun.com/pypi/simple/
+
+# 4. 安装依赖 (增加超时设置，防止网络波动)
+# 分步安装以便排查错误
+RUN pip install --no-cache-dir --default-timeout=1000 --upgrade pip
+RUN pip install --no-cache-dir --default-timeout=1000 sentence-transformers fastapi uvicorn setuptools
+
+# 5. 复制模型及代码
+COPY ./models/bge-m3 /app/models/bge-m3
+COPY ./scripts/embedding_server.py /app/embedding_server.py
+
+# 环境变量
+ENV MODEL_PATH=/app/models/bge-m3
+
+# 启动服务
+CMD ["uvicorn", "embedding_server:app", "--host", "0.0.0.0", "--port", "8000"]

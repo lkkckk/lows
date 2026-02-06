@@ -746,6 +746,88 @@ class LawService:
 
         return snippet
 
+
+    async def vector_search_for_rag(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
+        """
+        向量语义搜索（RAG 专用）
+        使用本地 embedding 服务将查询转为向量，然后在 MongoDB 中计算余弦相似度
+        """
+        from app.services import embedding_client
+        import numpy as np
+        
+        if not query or not query.strip():
+            return []
+        
+        # 1. 检查向量服务是否可用
+        if not await embedding_client.check_health():
+            print("[LawService] ⚠️ 向量服务不可用，跳过向量搜索")
+            return []
+        
+        # 2. 获取查询向量
+        query_embedding = await embedding_client.get_embedding(query)
+        if not query_embedding:
+            print("[LawService] ⚠️ 获取查询向量失败")
+            return []
+        
+        print(f"[LawService] 🔍 向量搜索: '{query}' (向量维度: {len(query_embedding)})")
+        
+        # 3. 从 MongoDB 获取所有有向量的条文
+        # 注意：这里使用内存计算相似度，适合中小规模数据（<10万条）
+        # 如果数据量很大，应使用专门的向量数据库
+        cursor = self.articles_collection.find(
+            {"embedding": {"$exists": True}},
+            {"_id": 1, "law_id": 1, "article_num": 1, "article_display": 1, "content": 1, "embedding": 1}
+        )
+        
+        articles = await cursor.to_list(length=10000)  # 限制最多处理 1 万条
+        
+        if not articles:
+            print("[LawService] ⚠️ 没有已向量化的条文")
+            return []
+        
+        # 4. 计算余弦相似度
+        query_vec = np.array(query_embedding)
+        
+        scored_articles = []
+        for article in articles:
+            article_vec = np.array(article.get("embedding", []))
+            if len(article_vec) == 0:
+                continue
+            
+            # 余弦相似度
+            similarity = np.dot(query_vec, article_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(article_vec))
+            scored_articles.append((similarity, article))
+        
+        # 5. 按相似度排序，取 top_k
+        scored_articles.sort(key=lambda x: x[0], reverse=True)
+        top_articles = scored_articles[:top_k]
+        
+        # 6. 关联法律信息
+        results = []
+        for similarity, article in top_articles:
+            law = await self.laws_collection.find_one(
+                {"law_id": article["law_id"]},
+                {"title": 1, "category": 1}
+            )
+            
+            result = {
+                "_id": str(article["_id"]),
+                "law_id": article["law_id"],
+                "law_title": law["title"] if law else "",
+                "law_category": law.get("category", "") if law else "",
+                "article_num": article.get("article_num"),
+                "article_display": article.get("article_display", ""),
+                "content": article.get("content", ""),
+                "similarity": float(similarity),
+            }
+            results.append(result)
+        
+        print(f"[LawService] ✅ 向量搜索完成，返回 {len(results)} 条结果")
+        if results:
+            print(f"[LawService]    最高相似度: {results[0]['similarity']:.4f} - {results[0]['law_title']} {results[0]['article_display']}")
+        
+        return results
+
     async def search_for_rag(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
         """
         知识库检索（RAG 专用）：优先规则召回与搜索引擎，必要时降级为文本索引/正则。

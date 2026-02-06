@@ -47,6 +47,22 @@ services:
       - ./backend:/app:rw
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # 向量服务 (本地离线 Embedding)
+  embedding:
+    image: law_system_embedding:latest
+    container_name: law_system_embedding
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    networks:
+      - law_system_network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s # 模型加载需要时间
+
   # React 前端应用
   frontend:
     image: node:18-alpine
@@ -59,7 +75,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
       - VITE_PORT=6011
       - VITE_BACKEND_HOST=backend
-      - VITE_BACKEND_PORT=4008
+      - VITE_BACKEND_PORT=8000
       - VITE_API_URL=http://localhost:4008/api
     volumes:
       # 前端热重载：挂载源码目录

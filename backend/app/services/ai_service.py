@@ -24,6 +24,22 @@ SYSTEM_PROMPT = """你是一名公安执法辅助中的【法律适用解释助�
 - 直接引用检索结果中的法名、条号和内容，不要自行推断或修改条号
 - 如检索结果中显示"2025年修订"等版本信息，请在回答中明确标注
 
+【关键】法律名称规范化：
+- 法律名称可能带版本后缀，如"（2018年修正）"、"（2025年修订）"等
+- 在验证用户引用时，应忽略版本后缀进行比较
+- 例如："《中华人民共和国刑事诉讼法》"与"《中华人民共和国刑事诉讼法（2018年修正）》"是同一部法律
+- 只要核心法律名称相同、条号相同、内容一致，就应判定为"正确"
+
+【核心】条文引用验证 vs 法律适用分析：
+当用户询问"引用的条文是否正确"或类似问题时，你需要区分两个层面：
+1. 【形式验证】：法律名称、条号、内容是否与数据库一致？——这是主要回答内容
+2. 【适用建议】：该条文是否最适合用户的具体场景？——仅作为参考意见，不作为"是否正确"的判断依据
+
+判定原则：
+- 只要法名、条号正确，且条文内容确实来自该法律，就应判定为"引用正确"
+- 至于该条文是否是"最佳选择"，可以作为补充建议，但不能因此判定"引用错误"
+- 例如：用户引用《刑事诉讼法》第144条查询银行卡交易明细，该条确实授权查询财产（存款、汇款等），交易明细属于财产信息的体现，引用是正确的
+
 回答原则：
 1. 对于涉及法律法规的问题，应先调用工具检索相关条文，再基于检索结果回答。
 2. 严格按照检索结果引用法条，完整给出法名、版本、条号。
@@ -34,6 +50,7 @@ SYSTEM_PROMPT = """你是一名公安执法辅助中的【法律适用解释助�
 - 不得虚构未经检索确认的法条内容
 - 不得自行推测条号（必须使用检索结果中的条号）
 - 不使用裁判式、定性式语言替代执法判断
+- 不要因"可能有更合适的条文"而否定用户正确引用的条文
 
 回答要求：
 - 语言简洁，结论前置
@@ -198,7 +215,64 @@ async def execute_search_legal_knowledge(
         # 取最新版法律的 law_id
         law_ids = [law["law_id"] for law in latest_laws]
         
-        # 查询这些法律的条文
+        # 判断是否需要在匹配到的法律内进行内容搜索
+        # 如果 keywords 不同于 law_name（如 law_name="治安管理处罚法", keywords="吸毒"）
+        # 则需要进行内容搜索，而不是返回前N条
+        needs_content_search = keywords and law_name and keywords != law_name and not looks_like_law_name(keywords)
+        
+        if needs_content_search:
+            print(f"[AI Service] 在匹配到的法律中搜索关键词: '{keywords}'")
+            
+            # 优先尝试向量搜索（限定在匹配到的法律范围内）
+            import os
+            vector_enabled = os.getenv("VECTOR_SEARCH_ENABLED", "true").lower() == "true"
+            
+            if vector_enabled:
+                try:
+                    # 向量搜索，过滤结果只保留匹配到的法律
+                    vector_items = await law_service.vector_search_for_rag(keywords, top_k=top_k * 3)
+                    if vector_items:
+                        # 过滤：只保留匹配到的法律的条文
+                        filtered_items = [item for item in vector_items if item.get("law_id") in law_ids]
+                        if filtered_items:
+                            print(f"[AI Service] 向量搜索在 {latest_laws[0]['title']} 中找到 {len(filtered_items)} 条相关条文")
+                            articles = []
+                            for item in filtered_items[:top_k]:
+                                articles.append({
+                                    "law_title": item.get("law_title", ""),
+                                    "article_display": item.get("article_display", ""),
+                                    "content": item.get("content", "")[:800] if len(item.get("content", "")) > 800 else item.get("content", ""),
+                                })
+                            return {
+                                "found": True,
+                                "message": f"在《{latest_laws[0]['title']}》中检索到 {len(articles)} 条相关法规（语义匹配）",
+                                "articles": articles
+                            }
+                except Exception as e:
+                    print(f"[AI Service] ⚠️ 向量搜索异常: {e}, 回退到关键词搜索")
+            
+            # 向量搜索无结果，尝试关键词内容匹配
+            article_query = {
+                "law_id": {"$in": law_ids},
+                "content": {"$regex": keywords, "$options": "i"}
+            }
+            articles = await articles_collection.find(article_query).sort("article_num", 1).limit(top_k).to_list(length=top_k)
+            
+            if articles:
+                law_map = {law["law_id"]: law["title"] for law in latest_laws}
+                items = []
+                for article in articles:
+                    items.append({
+                        "law_id": article.get("law_id"),
+                        "law_title": law_map.get(article.get("law_id"), ""),
+                        "article_num": article.get("article_num"),
+                        "article_display": article.get("article_display", ""),
+                        "content": article.get("content", ""),
+                    })
+                print(f"[AI Service] 在法律中按内容匹配到 {len(items)} 条条文")
+                return await _filter_and_format_results(items, keywords, top_k)
+        
+        # 查询这些法律的条文（仅当指定了条号，或不需要内容搜索时）
         article_query = {"law_id": {"$in": law_ids}}
         if article_num:
             # 如果指定了条号，用 article_display 正则匹配
@@ -224,9 +298,35 @@ async def execute_search_legal_knowledge(
             print(f"[AI Service] 按法律标题匹配到 {len(items)} 条条文")
             # 跳过后续的全文检索，直接进入版本过滤
             return await _filter_and_format_results(items, keywords, top_k)
+
     
-    # ========== 第二步：回退到全文检索 ==========
-    print(f"[AI Service] 未按标题匹配到，回退到全文检索")
+    # ========== 第二步：尝试向量语义搜索 ==========
+    import os
+    vector_enabled = os.getenv("VECTOR_SEARCH_ENABLED", "true").lower() == "true"
+    
+    if vector_enabled:
+        print(f"[AI Service] 尝试向量语义搜索: '{keywords}'")
+        vector_items = await law_service.vector_search_for_rag(keywords, top_k=top_k)
+        if vector_items:
+            print(f"[AI Service] 向量搜索成功，返回 {len(vector_items)} 条结果")
+            # 向量搜索结果已包含 law_title 等信息，直接格式化返回
+            articles = []
+            for item in vector_items[:top_k]:
+                articles.append({
+                    "law_title": item.get("law_title", ""),
+                    "article_display": item.get("article_display", ""),
+                    "content": item.get("content", "")[:800] if len(item.get("content", "")) > 800 else item.get("content", ""),
+                })
+            return {
+                "found": True,
+                "message": f"检索到 {len(articles)} 条相关法规（语义匹配）",
+                "articles": articles
+            }
+        else:
+            print(f"[AI Service] 向量搜索无结果或服务不可用，回退到关键词搜索")
+    
+    # ========== 第三步：回退到全文检索 ==========
+    print(f"[AI Service] 使用关键词检索")
     
     # 构建搜索查询
     if law_name and article_num:
@@ -357,7 +457,7 @@ async def _call_llm(
     payload = {
         "model": model,
         "messages": messages,
-        "temperature": 0.7,
+        "temperature": 0,
         "max_tokens": 2000,
     }
     
