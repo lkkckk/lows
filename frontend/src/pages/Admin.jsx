@@ -19,8 +19,9 @@ const STATUS_OPTIONS = [
     { value: '已修订', label: '已修订', color: '#6b7280' },
 ];
 
-const CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '内部规章', '其他'];
-const LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
+// 分类和层级选项将从 API 动态获取
+const DEFAULT_CATEGORY_OPTIONS = ['刑事法律', '行政法律', '民事法律', '程序规定', '司法解释', '内部规章', '其他'];
+const DEFAULT_LEVEL_OPTIONS = ['宪法', '法律', '行政法规', '地方性法规', '部门规章', '司法解释', '其他'];
 
 // ==================== 仪表盘模块 ====================
 const DashboardModule = ({ laws, todayViews, totalViews, tokenUsage }) => {
@@ -506,6 +507,10 @@ export default function Admin() {
         call_count: 0,
     });
 
+    // 动态分类和层级选项
+    const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORY_OPTIONS);
+    const [levelOptions, setLevelOptions] = useState(DEFAULT_LEVEL_OPTIONS);
+
     useEffect(() => {
         fetchLaws();
         fetchPopupSettings();
@@ -514,6 +519,7 @@ export default function Admin() {
         fetchAiSettings();
         fetchIpAccessSettings();
         fetchTokenUsage();
+        fetchCategoriesAndLevels();
     }, []);
 
     const fetchLaws = async () => {
@@ -525,6 +531,26 @@ export default function Admin() {
             message.error('加载法规列表失败');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchCategoriesAndLevels = async () => {
+        try {
+            const [catRes, levelRes] = await Promise.all([
+                getLawCategories(),
+                getLawLevels()
+            ]);
+            if (catRes.success && catRes.data?.length > 0) {
+                // 合并默认选项和API返回的选项，去重
+                const merged = [...new Set([...DEFAULT_CATEGORY_OPTIONS, ...catRes.data])];
+                setCategoryOptions(merged.filter(c => c));
+            }
+            if (levelRes.success && levelRes.data?.length > 0) {
+                const merged = [...new Set([...DEFAULT_LEVEL_OPTIONS, ...levelRes.data])];
+                setLevelOptions(merged.filter(l => l));
+            }
+        } catch (error) {
+            console.error('加载分类/层级选项失败:', error);
         }
     };
 
@@ -845,7 +871,7 @@ export default function Admin() {
                                         onChange={(e) => handleEditChange('category', e.target.value)}
                                     >
                                         <option value="">请选择</option>
-                                        {CATEGORY_OPTIONS.map(cat => (
+                                        {categoryOptions.map(cat => (
                                             <option key={cat} value={cat}>{cat}</option>
                                         ))}
                                     </select>
@@ -857,7 +883,7 @@ export default function Admin() {
                                         onChange={(e) => handleEditChange('level', e.target.value)}
                                     >
                                         <option value="">请选择</option>
-                                        {LEVEL_OPTIONS.map(lvl => (
+                                        {levelOptions.map(lvl => (
                                             <option key={lvl} value={lvl}>{lvl}</option>
                                         ))}
                                     </select>
