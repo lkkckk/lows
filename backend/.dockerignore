@@ -1,0 +1,26 @@
+# Exclude large models (they are in the embedding service)
+models/
+
+# Exclude temporary files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Exclude virtual environments
+venv/
+env/
+.env
+
+# Exclude git
+.git/
+.gitignore
+
+# Exclude large build artifacts
+*.tar
+embedding.tar
+*.log
+
+# Exclude IDE settings
+.vscode/
+.idea/

@@ -8,6 +8,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from pathlib import Path
 import json
 from app.services.search_engine import get_search_engine
+from app.services import embedding_client
 import hashlib
 import re
 import math
@@ -171,6 +172,19 @@ class LawService:
             article_docs.append(art_doc)
             
         if article_docs:
+            # 自动向量化：为每个条文生成向量
+            try:
+                contents = [doc["content"][:2000] for doc in article_docs]  # 限制长度
+                embeddings = await embedding_client.get_embeddings(contents)
+                if embeddings and len(embeddings) == len(article_docs):
+                    for i, emb in enumerate(embeddings):
+                        article_docs[i]["embedding"] = emb
+                    print(f"[LawService] ✅ 自动向量化成功: {len(embeddings)} 条")
+                else:
+                    print(f"[LawService] ⚠️ 向量化失败，条文将不包含向量")
+            except Exception as e:
+                print(f"[LawService] ⚠️ 向量服务异常: {e}，条文将不包含向量")
+            
             await self.articles_collection.insert_many(article_docs)
             
         return {"law_id": law_id, "message": f"成功导入 {len(article_docs)} 条条文"}
