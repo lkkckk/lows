@@ -816,19 +816,23 @@ class LawService:
         scored_articles.sort(key=lambda x: x[0], reverse=True)
         top_articles = scored_articles[:top_k]
         
-        # 6. 关联法律信息
+        # 6. 批量关联法律信息（性能优化：避免 N+1 查询）
+        law_ids_set = list({article["law_id"] for _, article in top_articles})
+        law_docs = await self.laws_collection.find(
+            {"law_id": {"$in": law_ids_set}},
+            {"law_id": 1, "title": 1, "category": 1}
+        ).to_list(length=len(law_ids_set))
+        law_map = {law["law_id"]: law for law in law_docs}
+        
         results = []
         for similarity, article in top_articles:
-            law = await self.laws_collection.find_one(
-                {"law_id": article["law_id"]},
-                {"title": 1, "category": 1}
-            )
+            law = law_map.get(article["law_id"], {})
             
             result = {
                 "_id": str(article["_id"]),
                 "law_id": article["law_id"],
-                "law_title": law["title"] if law else "",
-                "law_category": law.get("category", "") if law else "",
+                "law_title": law.get("title", ""),
+                "law_category": law.get("category", ""),
                 "article_num": article.get("article_num"),
                 "article_display": article.get("article_display", ""),
                 "content": article.get("content", ""),
@@ -839,6 +843,7 @@ class LawService:
         print(f"[LawService] ✅ 向量搜索完成，返回 {len(results)} 条结果")
         if results:
             print(f"[LawService]    最高相似度: {results[0]['similarity']:.4f} - {results[0]['law_title']} {results[0]['article_display']}")
+            print(f"[LawService]    最低相似度: {results[-1]['similarity']:.4f} - {results[-1]['law_title']} {results[-1]['article_display']}")
         
         return results
 

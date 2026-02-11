@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
-import { Send, MessageCircle, Bot, User, Sparkles, Trash2, Copy, Check } from 'lucide-react';
-import { sendAiMessage } from '../services/api';
+import { Send, MessageCircle, Bot, User, Sparkles, Trash2, Copy, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { sendAiMessage, submitAiFeedback } from '../services/api';
 import './AiConsult.css';
 
 // sessionStorage key
@@ -45,6 +45,7 @@ export default function AiConsult() {
     const [inputValue, setInputValue] = useState('');
     const [loading, setLoading] = useState(false);
     const [copiedIndex, setCopiedIndex] = useState(null);
+    const [feedbackMap, setFeedbackMap] = useState({});  // index -> 'good' | 'bad'
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
 
@@ -57,6 +58,29 @@ export default function AiConsult() {
             setTimeout(() => setCopiedIndex(null), 2000);
         } catch (err) {
             message.error('复制失败');
+        }
+    };
+
+    // 提交反馈（好/坏答案）
+    const handleFeedback = async (index, isGood) => {
+        // 找到对应的用户问题（前一条 user 消息）
+        let question = '';
+        for (let i = index - 1; i >= 0; i--) {
+            if (messages[i].role === 'user') {
+                question = messages[i].content;
+                break;
+            }
+        }
+        if (!question) return;
+
+        const answer = messages[index].content;
+        
+        try {
+            await submitAiFeedback(question, answer, isGood);
+            setFeedbackMap(prev => ({ ...prev, [index]: isGood ? 'good' : 'bad' }));
+            message.success(isGood ? '已记住此回答，下次将优先使用' : '已标记，下次将重新生成');
+        } catch (err) {
+            message.error('反馈提交失败');
         }
     };
 
@@ -162,17 +186,39 @@ export default function AiConsult() {
                                 <div className="message-bubble">
                                     {msg.content}
                                 </div>
-                                <button
-                                    className="copy-btn"
-                                    onClick={() => handleCopy(msg.content, index)}
-                                    title="复制内容"
-                                >
-                                    {copiedIndex === index ? (
-                                        <><Check size={14} /> 已复制</>
-                                    ) : (
-                                        <><Copy size={14} /> 复制</>
+                                <div className="message-actions">
+                                    <button
+                                        className="copy-btn"
+                                        onClick={() => handleCopy(msg.content, index)}
+                                        title="复制内容"
+                                    >
+                                        {copiedIndex === index ? (
+                                            <><Check size={14} /> 已复制</>
+                                        ) : (
+                                            <><Copy size={14} /> 复制</>
+                                        )}
+                                    </button>
+                                    {msg.role === 'assistant' && index > 0 && (
+                                        <>
+                                            <button
+                                                className={`feedback-btn good ${feedbackMap[index] === 'good' ? 'active' : ''}`}
+                                                onClick={() => handleFeedback(index, true)}
+                                                disabled={!!feedbackMap[index]}
+                                                title="回答正确，记住它"
+                                            >
+                                                <ThumbsUp size={14} />
+                                            </button>
+                                            <button
+                                                className={`feedback-btn bad ${feedbackMap[index] === 'bad' ? 'active' : ''}`}
+                                                onClick={() => handleFeedback(index, false)}
+                                                disabled={!!feedbackMap[index]}
+                                                title="回答有误，下次重新生成"
+                                            >
+                                                <ThumbsDown size={14} />
+                                            </button>
+                                        </>
                                     )}
-                                </button>
+                                </div>
                             </div>
                         </div>
                     ))}

@@ -230,6 +230,22 @@ export const sendAiMessage = (message, history = null) => {
 };
 
 /**
+ * 提交 AI 回答反馈（好/坏）
+ * @param {string} question - 用户问题
+ * @param {string} answer - AI 回答
+ * @param {boolean} isGood - 是否是好答案
+ * @param {Array} sources - 引用来源（可选）
+ */
+export const submitAiFeedback = (question, answer, isGood, sources = null) => {
+    return apiClient.post('/ai/feedback', {
+        question,
+        answer,
+        is_good: isGood,
+        sources,
+    });
+};
+
+/**
  * 获取 AI 模型配置
  */
 export const getAiSettings = () => {

@@ -141,11 +141,25 @@
 }
 
 /* 复制按钮 */
+.message-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+}
+
+.message-content:hover .message-actions {
+    opacity: 1;
+    visibility: visible;
+}
+
 .copy-btn {
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-top: 6px;
     padding: 4px 10px;
     font-size: 0.75rem;
     color: rgba(255, 255, 255, 0.5);
@@ -154,13 +168,10 @@
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
-    opacity: 0;
-    visibility: hidden;
 }
 
 .message-content:hover .copy-btn {
-    opacity: 1;
-    visibility: visible;
+    /* visibility handled by parent .message-actions */
 }
 
 .copy-btn:hover {
@@ -169,8 +180,54 @@
     border-color: rgba(255, 255, 255, 0.3);
 }
 
-.message.user .copy-btn {
+.message.user .message-actions {
     margin-left: auto;
+    justify-content: flex-end;
+}
+
+/* 反馈按钮 */
+.feedback-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.feedback-btn:hover:not(:disabled) {
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.feedback-btn.good:hover:not(:disabled),
+.feedback-btn.good.active {
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.4);
+}
+
+.feedback-btn.bad:hover:not(:disabled),
+.feedback-btn.bad.active {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.feedback-btn:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.feedback-btn.active {
+    opacity: 1 !important;
 }
 
 /* 加载动画 */
