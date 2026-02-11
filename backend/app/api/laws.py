@@ -1,7 +1,7 @@
 """
 法规相关 API 路由
 """
-from fastapi import APIRouter, HTTPException, Query, Depends, Request
+from fastapi import APIRouter, HTTPException, Query, Depends, Request, BackgroundTasks
 from typing import Optional, List
 from app.models import APIResponse, SearchRequest, LawCreate
 from app.services import LawService
@@ -23,14 +23,43 @@ def get_law_service(request: Request) -> LawService:
 @router.post("/", response_model=APIResponse)
 async def create_law(
     law_in: LawCreate,
+    background_tasks: BackgroundTasks,
     service: LawService = Depends(get_law_service),
 ):
     """
-    手动创建法规
+    手动创建法规（保存后异步触发向量化）
     """
     try:
         result = await service.create_law(law_in)
+        # 保存成功后，在后台异步执行向量化（不阻塞响应）
+        law_id = result.get("law_id")
+        if law_id:
+            background_tasks.add_task(service.vectorize_law_articles, law_id)
         return APIResponse(success=True, data=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/vectorize-status/{law_id}", response_model=APIResponse)
+async def get_vectorize_status(
+    law_id: str,
+    service: LawService = Depends(get_law_service),
+):
+    """
+    查询法规条文向量化状态
+    """
+    try:
+        total = await service.articles_collection.count_documents({"law_id": law_id})
+        vectorized = await service.articles_collection.count_documents(
+            {"law_id": law_id, "embedding": {"$exists": True}}
+        )
+        return APIResponse(success=True, data={
+            "law_id": law_id,
+            "total": total,
+            "vectorized": vectorized,
+            "pending": total - vectorized,
+            "complete": total > 0 and vectorized == total
+        })
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

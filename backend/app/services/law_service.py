@@ -172,22 +172,66 @@ class LawService:
             article_docs.append(art_doc)
             
         if article_docs:
-            # 自动向量化：为每个条文生成向量
-            try:
-                contents = [doc["content"][:2000] for doc in article_docs]  # 限制长度
-                embeddings = await embedding_client.get_embeddings(contents)
-                if embeddings and len(embeddings) == len(article_docs):
-                    for i, emb in enumerate(embeddings):
-                        article_docs[i]["embedding"] = emb
-                    print(f"[LawService] ✅ 自动向量化成功: {len(embeddings)} 条")
-                else:
-                    print(f"[LawService] ⚠️ 向量化失败，条文将不包含向量")
-            except Exception as e:
-                print(f"[LawService] ⚠️ 向量服务异常: {e}，条文将不包含向量")
-            
+            # 先入库，不等向量化（向量化由后台任务异步完成）
             await self.articles_collection.insert_many(article_docs)
             
-        return {"law_id": law_id, "message": f"成功导入 {len(article_docs)} 条条文"}
+        return {"law_id": law_id, "article_count": len(article_docs), "message": f"成功导入 {len(article_docs)} 条条文"}
+
+    async def vectorize_law_articles(self, law_id: str) -> Dict[str, Any]:
+        """
+        为指定法规的条文异步生成向量（后台任务调用）
+        分批处理，每批10条，带重试
+        """
+        BATCH_SIZE = 10
+        
+        # 检查向量服务是否可用
+        if not await embedding_client.check_health():
+            print(f"[LawService] ⚠️ 向量服务不可用，跳过 {law_id} 的向量化")
+            return {"law_id": law_id, "status": "skipped", "reason": "向量服务不可用"}
+        
+        # 查询该法规下未向量化的条文
+        cursor = self.articles_collection.find(
+            {"law_id": law_id, "embedding": {"$exists": False}},
+            {"_id": 1, "content": 1}
+        )
+        articles = await cursor.to_list(length=None)
+        
+        if not articles:
+            print(f"[LawService] ℹ️ {law_id} 无需向量化（已全部完成或无条文）")
+            return {"law_id": law_id, "status": "done", "vectorized": 0, "failed": 0}
+        
+        total = len(articles)
+        vectorized = 0
+        failed = 0
+        
+        print(f"[LawService] 🔄 开始后台向量化 {law_id}: {total} 条待处理")
+        
+        for batch_start in range(0, total, BATCH_SIZE):
+            batch = articles[batch_start:batch_start + BATCH_SIZE]
+            try:
+                contents = [a["content"][:2000] for a in batch]
+                embeddings = await embedding_client.get_embeddings(contents)
+                if embeddings and len(embeddings) == len(batch):
+                    for i, emb in enumerate(embeddings):
+                        await self.articles_collection.update_one(
+                            {"_id": batch[i]["_id"]},
+                            {"$set": {"embedding": emb}}
+                        )
+                    vectorized += len(batch)
+                else:
+                    failed += len(batch)
+                    print(f"[LawService] ⚠️ 批次 {batch_start // BATCH_SIZE + 1} 返回不匹配")
+            except Exception as e:
+                failed += len(batch)
+                print(f"[LawService] ⚠️ 批次 {batch_start // BATCH_SIZE + 1} 异常: {e}")
+        
+        status = "done" if failed == 0 else ("partial" if vectorized > 0 else "failed")
+        msg = f"[LawService] {'✅' if status == 'done' else '⚠️'} 后台向量化完成 {law_id}: 成功 {vectorized}/{total}"
+        if failed > 0:
+            msg += f"，失败 {failed}"
+        print(msg)
+        
+        return {"law_id": law_id, "status": status, "vectorized": vectorized, "failed": failed, "total": total}
 
     async def get_laws_list(
         self,
