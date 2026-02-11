@@ -110,6 +110,27 @@ async def get_ai_config(db: AsyncIOMotorDatabase) -> dict:
     }
 
 
+def _looks_like_law_name(name: str) -> bool:
+    """判断是否像法律名称"""
+    law_indicators = ["法", "条例", "规定", "规则", "办法", "解释", "意见", "通知", "决定"]
+    return any(ind in name for ind in law_indicators)
+
+
+def _get_law_year(title: str) -> int:
+    """从法律标题中提取年份"""
+    import re
+    year_pattern = r'[（\(](\d{4})年[修订正]+[）\)]'
+    match = re.search(year_pattern, title)
+    return int(match.group(1)) if match else 0
+
+
+def _get_law_base_name(title: str) -> str:
+    """提取法律基础名称（去掉年份部分）"""
+    import re
+    year_pattern = r'[（\(]\d{4}年[修订正]+[）\)]'
+    return re.sub(year_pattern, '', title).strip()
+
+
 async def execute_search_legal_knowledge(
     db: AsyncIOMotorDatabase,
     keywords: str,
@@ -175,11 +196,7 @@ async def execute_search_legal_knowledge(
         article_query = {}
         if law_name:
             # 如果指定了法律名称，先匹配法律
-            def looks_like_law_name(name: str) -> bool:
-                law_indicators = ["法", "条例", "规定", "规则", "办法", "解释", "意见", "通知", "决定"]
-                return any(ind in name for ind in law_indicators)
-            
-            if looks_like_law_name(law_name):
+            if _looks_like_law_name(law_name):
                 law_name_pattern = law_name.replace("中华人民共和国", "").strip()
                 law_regex = {"title": {"$regex": law_name_pattern, "$options": "i"}}
                 matching_laws = await laws_collection.find(
@@ -188,19 +205,10 @@ async def execute_search_legal_knowledge(
                 
                 if matching_laws:
                     # 过滤旧版本，保留最新版
-                    def get_law_year(title: str) -> int:
-                        year_pattern = r'[（\(](\d{4})年[修订正]+[）\)]'
-                        match = re.search(year_pattern, title)
-                        return int(match.group(1)) if match else 0
-                    
-                    def get_law_base_name(title: str) -> str:
-                        year_pattern = r'[（\(]\d{4}年[修订正]+[）\)]'
-                        return re.sub(year_pattern, '', title).strip()
-                    
                     law_by_base = {}
                     for law in matching_laws:
-                        base_name = get_law_base_name(law["title"])
-                        year = get_law_year(law["title"])
+                        base_name = _get_law_base_name(law["title"])
+                        year = _get_law_year(law["title"])
                         if base_name not in law_by_base or year > law_by_base[base_name]["year"]:
                             law_by_base[base_name] = {"law": law, "year": year}
                     
@@ -240,11 +248,7 @@ async def execute_search_legal_knowledge(
     # ========== 步骤 2: 标题匹配（如果提供了 law_name）==========
     law_ids = None
     if law_name:
-        def looks_like_law_name(name: str) -> bool:
-            law_indicators = ["法", "条例", "规定", "规则", "办法", "解释", "意见", "通知", "决定"]
-            return any(ind in name for ind in law_indicators)
-        
-        if looks_like_law_name(law_name):
+        if _looks_like_law_name(law_name):
             law_name_pattern = law_name.replace("中华人民共和国", "").strip()
             law_regex = {"title": {"$regex": law_name_pattern, "$options": "i"}}
             
@@ -256,19 +260,10 @@ async def execute_search_legal_knowledge(
                 print(f"[AI Service] 匹配到 {len(matching_laws)} 部法律: {[l['title'] for l in matching_laws]}")
                 
                 # 过滤旧版本法律，只保留最新版
-                def get_law_year(title: str) -> int:
-                    year_pattern = r'[（\(](\d{4})年[修订正]+[）\)]'
-                    match = re.search(year_pattern, title)
-                    return int(match.group(1)) if match else 0
-                
-                def get_law_base_name(title: str) -> str:
-                    year_pattern = r'[（\(]\d{4}年[修订正]+[）\)]'
-                    return re.sub(year_pattern, '', title).strip()
-                
                 law_by_base = {}
                 for law in matching_laws:
-                    base_name = get_law_base_name(law["title"])
-                    year = get_law_year(law["title"])
+                    base_name = _get_law_base_name(law["title"])
+                    year = _get_law_year(law["title"])
                     if base_name not in law_by_base or year > law_by_base[base_name]["year"]:
                         law_by_base[base_name] = {"law": law, "year": year}
                 
@@ -301,8 +296,7 @@ async def execute_search_legal_knowledge(
             
             if vector_items:
                 print(f"[AI Service] 向量搜索成功，返回 {len(vector_items)} 条结果")
-                if vector_items:
-                    print(f"[AI Service]    最高相似度: {vector_items[0].get('similarity', 0):.4f} - {vector_items[0].get('law_title', '')} {vector_items[0].get('article_display', '')}")
+                print(f"[AI Service]    最高相似度: {vector_items[0].get('similarity', 0):.4f} - {vector_items[0].get('law_title', '')} {vector_items[0].get('article_display', '')}")
         except Exception as e:
             print(f"[AI Service] ⚠️ 向量搜索异常: {e}")
             vector_items = []
