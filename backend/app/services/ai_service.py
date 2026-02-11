@@ -119,17 +119,27 @@ async def execute_search_legal_knowledge(
 ) -> Dict[str, Any]:
     """
     执行法规知识库检索（Function Calling 工具实现）
-    优先按法律标题匹配，确保返回的是该法律的条文，而非引用了该法律的其他条文。
+    
+    检索策略：
+    1. 如果有明确条号（article_num），走精准条号查找
+    2. 始终尝试向量搜索作为主要检索方式
+    3. 如果有 law_name 且标题匹配成功，用匹配到的 law_ids 过滤向量搜索结果
+    4. 关键词正则搜索作为兜底补充
+    5. 将向量搜索结果和关键词搜索结果去重合并
     """
     import re
+    import os
     
     law_service = LawService(db)
     laws_collection = db["laws"]
     articles_collection = db["law_articles"]
     
+    # 相似度阈值
+    MIN_SIMILARITY = 0.45
+    
     # ========== 关键词清理 ==========
     # 去除常见的查询后缀词，提取核心行为词
-    suffix_pattern = r'(处罚|规定|条款|法律|法规|如何|怎么|什么|相关|行为|罪|罪名)$'
+    suffix_pattern = r'(处罚|规定|条款|法律|法规|如何|怎么|什么|相关|行为)$'
     clean_keywords = re.sub(suffix_pattern, '', keywords).strip() if keywords else keywords
     if clean_keywords and clean_keywords != keywords:
         print(f"[AI Service] 关键词清理: '{keywords}' -> '{clean_keywords}'")
@@ -155,201 +165,211 @@ async def execute_search_legal_knowledge(
         keywords = SYNONYM_MAP[keywords]
         print(f"[AI Service] 同义词映射: '{original}' -> '{keywords}'")
     
-    # 确定要搜索的法律名称
-    search_law_name = law_name or keywords
+    print(f"[AI Service] 检索参数 - keywords: '{keywords}', law_name: '{law_name}', article_num: {article_num}")
     
-    print(f"[AI Service] 检索法律: '{search_law_name}', 条号: {article_num}")
-    
-    # ========== 判断关键词类型 ==========
-    # 如果关键词像法律名称（包含"法""条例""规定""解释"等），才进行标题匹配
-    # 否则（如"赌博""卖淫"等行为关键词），直接进行内容检索
-    def looks_like_law_name(name: str) -> bool:
-        """判断是否像法律名称"""
-        law_indicators = ["法", "条例", "规定", "规则", "办法", "解释", "意见", "通知", "决定"]
-        return any(ind in name for ind in law_indicators)
-    
-    # 如果显式提供了 law_name，或关键词像法律名称，才尝试标题匹配
-    should_try_title_match = law_name or looks_like_law_name(search_law_name)
-    matching_laws = []
-    
-    if should_try_title_match:
-        # ========== 第一步：尝试按法律标题匹配 ==========
-        # 用正则匹配法律标题（支持模糊匹配）
-        law_name_pattern = search_law_name.replace("中华人民共和国", "").strip()
-        law_regex = {"title": {"$regex": law_name_pattern, "$options": "i"}}
+    # ========== 步骤 1: 精准条号查找 ==========
+    if article_num:
+        print(f"[AI Service] 精准条号查找: 第{article_num}条")
         
-        matching_laws = await laws_collection.find(
-            law_regex, {"law_id": 1, "title": 1}
-        ).to_list(length=10)
-    else:
-        print(f"[AI Service] '{search_law_name}' 不像法律名称，跳过标题匹配，直接内容检索")
-    
-    if matching_laws:
-        print(f"[AI Service] 匹配到 {len(matching_laws)} 部法律: {[l['title'] for l in matching_laws]}")
-        
-        # ========== 过滤旧版本法律，只保留最新版 ==========
-        import re
-        def get_law_year(title: str) -> int:
-            """从法律标题中提取年份"""
-            year_pattern = r'[（\(](\d{4})年[修订正]+[）\)]'
-            match = re.search(year_pattern, title)
-            return int(match.group(1)) if match else 0
-        
-        def get_law_base_name(title: str) -> str:
-            """提取法律基础名称（去掉年份部分）"""
-            year_pattern = r'[（\(]\d{4}年[修订正]+[）\)]'
-            return re.sub(year_pattern, '', title).strip()
-        
-        # 按基础名称分组，保留最新版本
-        law_by_base = {}
-        for law in matching_laws:
-            base_name = get_law_base_name(law["title"])
-            year = get_law_year(law["title"])
-            if base_name not in law_by_base or year > law_by_base[base_name]["year"]:
-                law_by_base[base_name] = {"law": law, "year": year}
-        
-        # 只使用最新版本的法律
-        latest_laws = [v["law"] for v in law_by_base.values()]
-        print(f"[AI Service] 过滤后保留最新版本: {[l['title'] for l in latest_laws]}")
-        
-        # 取最新版法律的 law_id
-        law_ids = [law["law_id"] for law in latest_laws]
-        
-        # 判断是否需要在匹配到的法律内进行内容搜索
-        # 如果 keywords 不同于 law_name（如 law_name="治安管理处罚法", keywords="吸毒"）
-        # 则需要进行内容搜索，而不是返回前N条
-        needs_content_search = keywords and law_name and keywords != law_name and not looks_like_law_name(keywords)
-        
-        if needs_content_search:
-            print(f"[AI Service] 在匹配到的法律中搜索关键词: '{keywords}'")
+        # 构建查询条件
+        article_query = {}
+        if law_name:
+            # 如果指定了法律名称，先匹配法律
+            def looks_like_law_name(name: str) -> bool:
+                law_indicators = ["法", "条例", "规定", "规则", "办法", "解释", "意见", "通知", "决定"]
+                return any(ind in name for ind in law_indicators)
             
-            # 优先尝试向量搜索（限定在匹配到的法律范围内）
-            import os
-            vector_enabled = os.getenv("VECTOR_SEARCH_ENABLED", "true").lower() == "true"
-            
-            if vector_enabled:
-                try:
-                    # 向量搜索，过滤结果只保留匹配到的法律
-                    vector_items = await law_service.vector_search_for_rag(keywords, top_k=top_k * 3)
-                    if vector_items:
-                        # 过滤：只保留匹配到的法律的条文
-                        filtered_items = [item for item in vector_items if item.get("law_id") in law_ids]
-                        if filtered_items:
-                            print(f"[AI Service] 向量搜索在 {latest_laws[0]['title']} 中找到 {len(filtered_items)} 条相关条文")
-                            articles = []
-                            for item in filtered_items[:top_k]:
-                                articles.append({
-                                    "law_title": item.get("law_title", ""),
-                                    "article_display": item.get("article_display", ""),
-                                    "content": item.get("content", "")[:800] if len(item.get("content", "")) > 800 else item.get("content", ""),
-                                })
-                            return {
-                                "found": True,
-                                "message": f"在《{latest_laws[0]['title']}》中检索到 {len(articles)} 条相关法规（语义匹配）",
-                                "articles": articles
-                            }
-                except Exception as e:
-                    print(f"[AI Service] ⚠️ 向量搜索异常: {e}, 回退到关键词搜索")
-            
-            # 向量搜索无结果，尝试关键词内容匹配
-            article_query = {
-                "law_id": {"$in": law_ids},
-                "content": {"$regex": keywords, "$options": "i"}
-            }
-            articles = await articles_collection.find(article_query).sort("article_num", 1).limit(top_k).to_list(length=top_k)
-            
-            if articles:
-                law_map = {law["law_id"]: law["title"] for law in latest_laws}
-                items = []
-                for article in articles:
-                    items.append({
-                        "law_id": article.get("law_id"),
-                        "law_title": law_map.get(article.get("law_id"), ""),
-                        "article_num": article.get("article_num"),
-                        "article_display": article.get("article_display", ""),
-                        "content": article.get("content", ""),
-                    })
-                print(f"[AI Service] 在法律中按内容匹配到 {len(items)} 条条文")
-                return await _filter_and_format_results(items, keywords, top_k)
+            if looks_like_law_name(law_name):
+                law_name_pattern = law_name.replace("中华人民共和国", "").strip()
+                law_regex = {"title": {"$regex": law_name_pattern, "$options": "i"}}
+                matching_laws = await laws_collection.find(
+                    law_regex, {"law_id": 1, "title": 1}
+                ).to_list(length=10)
+                
+                if matching_laws:
+                    # 过滤旧版本，保留最新版
+                    def get_law_year(title: str) -> int:
+                        year_pattern = r'[（\(](\d{4})年[修订正]+[）\)]'
+                        match = re.search(year_pattern, title)
+                        return int(match.group(1)) if match else 0
+                    
+                    def get_law_base_name(title: str) -> str:
+                        year_pattern = r'[（\(]\d{4}年[修订正]+[）\)]'
+                        return re.sub(year_pattern, '', title).strip()
+                    
+                    law_by_base = {}
+                    for law in matching_laws:
+                        base_name = get_law_base_name(law["title"])
+                        year = get_law_year(law["title"])
+                        if base_name not in law_by_base or year > law_by_base[base_name]["year"]:
+                            law_by_base[base_name] = {"law": law, "year": year}
+                    
+                    latest_laws = [v["law"] for v in law_by_base.values()]
+                    law_ids = [law["law_id"] for law in latest_laws]
+                    article_query["law_id"] = {"$in": law_ids}
+                    print(f"[AI Service] 匹配到法律: {[l['title'] for l in latest_laws]}")
         
-        # 查询这些法律的条文（仅当指定了条号，或不需要内容搜索时）
-        article_query = {"law_id": {"$in": law_ids}}
-        if article_num:
-            # 如果指定了条号，用 article_display 正则匹配
-            chinese_num = law_service._arabic_to_chinese(article_num)
-            article_query["article_display"] = {"$regex": f"^第{chinese_num}条", "$options": "i"}
+        # 匹配条号
+        chinese_num = law_service._arabic_to_chinese(article_num)
+        article_query["article_display"] = {"$regex": f"^第{chinese_num}条", "$options": "i"}
         
         articles = await articles_collection.find(article_query).sort("article_num", 1).limit(top_k).to_list(length=top_k)
         
         if articles:
-            # 构建法律ID到标题的映射
-            law_map = {law["law_id"]: law["title"] for law in latest_laws}
+            # 获取法律标题
+            law_ids_in_results = list(set(a.get("law_id") for a in articles if a.get("law_id")))
+            laws_map = {}
+            if law_ids_in_results:
+                laws_cursor = laws_collection.find({"law_id": {"$in": law_ids_in_results}}, {"law_id": 1, "title": 1})
+                async for law in laws_cursor:
+                    laws_map[law["law_id"]] = law["title"]
             
             items = []
             for article in articles:
                 items.append({
                     "law_id": article.get("law_id"),
-                    "law_title": law_map.get(article.get("law_id"), ""),
+                    "law_title": laws_map.get(article.get("law_id"), ""),
                     "article_num": article.get("article_num"),
                     "article_display": article.get("article_display", ""),
                     "content": article.get("content", ""),
                 })
             
-            print(f"[AI Service] 按法律标题匹配到 {len(items)} 条条文")
-            # 跳过后续的全文检索，直接进入版本过滤
+            print(f"[AI Service] 精准条号查找成功，返回 {len(items)} 条")
             return await _filter_and_format_results(items, keywords, top_k)
-
     
-    # ========== 第二步：尝试向量语义搜索 ==========
-    import os
+    # ========== 步骤 2: 标题匹配（如果提供了 law_name）==========
+    law_ids = None
+    if law_name:
+        def looks_like_law_name(name: str) -> bool:
+            law_indicators = ["法", "条例", "规定", "规则", "办法", "解释", "意见", "通知", "决定"]
+            return any(ind in name for ind in law_indicators)
+        
+        if looks_like_law_name(law_name):
+            law_name_pattern = law_name.replace("中华人民共和国", "").strip()
+            law_regex = {"title": {"$regex": law_name_pattern, "$options": "i"}}
+            
+            matching_laws = await laws_collection.find(
+                law_regex, {"law_id": 1, "title": 1}
+            ).to_list(length=10)
+            
+            if matching_laws:
+                print(f"[AI Service] 匹配到 {len(matching_laws)} 部法律: {[l['title'] for l in matching_laws]}")
+                
+                # 过滤旧版本法律，只保留最新版
+                def get_law_year(title: str) -> int:
+                    year_pattern = r'[（\(](\d{4})年[修订正]+[）\)]'
+                    match = re.search(year_pattern, title)
+                    return int(match.group(1)) if match else 0
+                
+                def get_law_base_name(title: str) -> str:
+                    year_pattern = r'[（\(]\d{4}年[修订正]+[）\)]'
+                    return re.sub(year_pattern, '', title).strip()
+                
+                law_by_base = {}
+                for law in matching_laws:
+                    base_name = get_law_base_name(law["title"])
+                    year = get_law_year(law["title"])
+                    if base_name not in law_by_base or year > law_by_base[base_name]["year"]:
+                        law_by_base[base_name] = {"law": law, "year": year}
+                
+                latest_laws = [v["law"] for v in law_by_base.values()]
+                print(f"[AI Service] 过滤后保留最新版本: {[l['title'] for l in latest_laws]}")
+                
+                law_ids = [law["law_id"] for law in latest_laws]
+    
+    # ========== 步骤 3: 向量搜索（主要检索方式）==========
+    vector_items = []
     vector_enabled = os.getenv("VECTOR_SEARCH_ENABLED", "true").lower() == "true"
     
     if vector_enabled:
         print(f"[AI Service] 尝试向量语义搜索: '{keywords}'")
-        vector_items = await law_service.vector_search_for_rag(keywords, top_k=top_k)
-        if vector_items:
-            print(f"[AI Service] 向量搜索成功，返回 {len(vector_items)} 条结果")
-            # 向量搜索结果已包含 law_title 等信息，直接格式化返回
-            articles = []
-            for item in vector_items[:top_k]:
-                articles.append({
-                    "law_title": item.get("law_title", ""),
-                    "article_display": item.get("article_display", ""),
-                    "content": item.get("content", "")[:800] if len(item.get("content", "")) > 800 else item.get("content", ""),
-                })
-            return {
-                "found": True,
-                "message": f"检索到 {len(articles)} 条相关法规（语义匹配）",
-                "articles": articles
-            }
-        else:
-            print(f"[AI Service] 向量搜索无结果或服务不可用，回退到关键词搜索")
-    
-    # ========== 第三步：回退到全文检索 ==========
-    print(f"[AI Service] 使用关键词检索")
-    
-    # 构建搜索查询
-    if law_name and article_num:
-        query = f"{law_name}第{article_num}条"
-    elif law_name and keywords and law_name != keywords:
-        query = f"{law_name} {keywords}"
-    elif law_name:
-        query = law_name
+        try:
+            vector_items = await law_service.vector_search_for_rag(keywords, top_k=top_k * 3)
+            
+            # 应用相似度阈值过滤
+            if vector_items:
+                original_count = len(vector_items)
+                vector_items = [item for item in vector_items if item.get("similarity", 0) >= MIN_SIMILARITY]
+                if original_count > len(vector_items):
+                    print(f"[AI Service] 相似度过滤: {original_count} -> {len(vector_items)} (阈值: {MIN_SIMILARITY})")
+            
+            # 如果有 law_ids 限制，过滤结果
+            if vector_items and law_ids:
+                original_count = len(vector_items)
+                vector_items = [item for item in vector_items if item.get("law_id") in law_ids]
+                print(f"[AI Service] 法律范围过滤: {original_count} -> {len(vector_items)}")
+            
+            if vector_items:
+                print(f"[AI Service] 向量搜索成功，返回 {len(vector_items)} 条结果")
+                if vector_items:
+                    print(f"[AI Service]    最高相似度: {vector_items[0].get('similarity', 0):.4f} - {vector_items[0].get('law_title', '')} {vector_items[0].get('article_display', '')}")
+        except Exception as e:
+            print(f"[AI Service] ⚠️ 向量搜索异常: {e}")
+            vector_items = []
     else:
-        query = keywords
+        print(f"[AI Service] 向量搜索未启用")
     
-    print(f"[AI Service] 全文检索查询: '{query}'")
+    # ========== 步骤 4: 关键词正则搜索（兜底补充）==========
+    keyword_items = []
+    print(f"[AI Service] 关键词正则搜索: '{keywords}'")
     
-    items = await law_service.search_for_rag(query, top_k=top_k * 2)
+    article_query = {"content": {"$regex": keywords, "$options": "i"}}
+    if law_ids:
+        article_query["law_id"] = {"$in": law_ids}
     
-    if not items:
+    articles = await articles_collection.find(article_query).sort("article_num", 1).limit(top_k * 2).to_list(length=top_k * 2)
+    
+    if articles:
+        # 获取法律标题
+        law_ids_in_results = list(set(a.get("law_id") for a in articles if a.get("law_id")))
+        laws_map = {}
+        if law_ids_in_results:
+            laws_cursor = laws_collection.find({"law_id": {"$in": law_ids_in_results}}, {"law_id": 1, "title": 1})
+            async for law in laws_cursor:
+                laws_map[law["law_id"]] = law["title"]
+        
+        for article in articles:
+            keyword_items.append({
+                "law_id": article.get("law_id"),
+                "law_title": laws_map.get(article.get("law_id"), ""),
+                "article_num": article.get("article_num"),
+                "article_display": article.get("article_display", ""),
+                "content": article.get("content", ""),
+            })
+        print(f"[AI Service] 关键词搜索找到 {len(keyword_items)} 条结果")
+    
+    # ========== 步骤 5: 合并去重 ==========
+    # 以 (law_id, article_num, article_display) 为key去重
+    seen = set()
+    merged_items = []
+    
+    # 优先使用向量搜索结果（相关性更高）
+    for item in vector_items:
+        key = (item.get("law_id"), item.get("article_num"), item.get("article_display"))
+        if key not in seen:
+            seen.add(key)
+            merged_items.append(item)
+    
+    # 补充关键词搜索结果
+    for item in keyword_items:
+        key = (item.get("law_id"), item.get("article_num"), item.get("article_display"))
+        if key not in seen:
+            seen.add(key)
+            merged_items.append(item)
+    
+    # 限制返回数量
+    merged_items = merged_items[:top_k * 2]
+    
+    print(f"[AI Service] 合并后共 {len(merged_items)} 条结果")
+    
+    if not merged_items:
         return {
             "found": False,
             "message": f"未检索到与'{keywords}'相关的法规条文",
             "articles": []
         }
     
-    return await _filter_and_format_results(items, keywords, top_k)
+    return await _filter_and_format_results(merged_items, keywords, top_k)
 
 
 async def _filter_and_format_results(
@@ -400,7 +420,7 @@ async def _filter_and_format_results(
         articles.append({
             "law_title": law_title,
             "article_display": article_display,
-            "content": content[:800] if len(content) > 800 else content,
+            "content": content[:1500] if len(content) > 1500 else content,
         })
     
     return {
@@ -458,12 +478,12 @@ async def _call_llm(
         "model": model,
         "messages": messages,
         "temperature": 0,
-        "max_tokens": 2000,
+        "max_tokens": 4000,
     }
     
     if tools:
         payload["tools"] = tools
-        payload["tool_choice"] = "auto"
+        payload["tool_choice"] = {"type": "function", "function": {"name": "search_legal_knowledge"}}
     
     async with httpx.AsyncClient(timeout=timeout, verify=not skip_ssl_verify) as client:
         response = await client.post(api_url, headers=headers, json=payload)
@@ -569,7 +589,9 @@ async def chat_with_ai(
             if tool_calls:
                 # AI 决定调用工具
                 print(f"[AI Service] AI 调用了工具: {len(tool_calls)} 个")
-                tool_result_text = ""
+                
+                # 追加 assistant 消息（包含 tool_calls）到原始消息列表
+                messages.append(msg)
                 
                 for tool_call in tool_calls:
                     func = tool_call.get("function", {})
@@ -603,12 +625,18 @@ async def chat_with_ai(
                             })
                         
                         tool_result_text = _format_tool_result(result)
+                        
+                        # 追加 tool 消息（标准 Function Calling 格式）
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call["id"],
+                            "content": tool_result_text
+                        })
                 
-                # 第二轮：带检索结果生成回答
-                print(f"[AI Service] 传给第二轮LLM的上下文(前500字): {tool_result_text[:500]}...")
-                messages2 = _build_messages_with_context(message, history, tool_result_text)
+                # 第二轮：使用标准 Function Calling 消息格式，不带 tools 参数
+                print(f"[AI Service] 第二轮调用，消息数: {len(messages)}")
                 data2 = await _call_llm(
-                    api_url, api_key, model, messages2, skip_ssl_verify
+                    api_url, api_key, model, messages, skip_ssl_verify
                 )
                 
                 # 累计 token 使用
