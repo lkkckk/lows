@@ -761,10 +761,15 @@ class LawService:
         return snippet
 
 
-    async def vector_search_for_rag(self, query: str, top_k: int = 6) -> List[Dict[str, Any]]:
+    async def vector_search_for_rag(self, query: str, top_k: int = 6, min_similarity: float = 0.3) -> List[Dict[str, Any]]:
         """
         向量语义搜索（RAG 专用）
         使用本地 embedding 服务将查询转为向量，然后在 MongoDB 中计算余弦相似度
+        
+        Args:
+            query: 查询文本
+            top_k: 返回结果数量上限
+            min_similarity: 最低相似度阈值（默认0.3），用于过滤完全不相关的结果
         """
         from app.services import embedding_client
         import numpy as np
@@ -810,7 +815,16 @@ class LawService:
             
             # 余弦相似度
             similarity = np.dot(query_vec, article_vec) / (np.linalg.norm(query_vec) * np.linalg.norm(article_vec))
-            scored_articles.append((similarity, article))
+            
+            # 应用基础相似度阈值，过滤完全不相关的结果
+            if similarity >= min_similarity:
+                scored_articles.append((similarity, article))
+        
+        if scored_articles:
+            original_count = len(articles)
+            filtered_count = len(scored_articles)
+            if filtered_count < original_count:
+                print(f"[LawService] 基础相似度过滤: {original_count} -> {filtered_count} (阈值: {min_similarity})")
         
         # 5. 按相似度排序，取 top_k
         scored_articles.sort(key=lambda x: x[0], reverse=True)
