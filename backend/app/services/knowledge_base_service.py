@@ -14,8 +14,43 @@ class KnowledgeBaseService:
         self.law_service = LawService(db)
 
     async def retrieve(self, query: str, top_k: int = 6) -> Dict[str, Any]:
-        items = await self.law_service.search_for_rag(query, top_k=top_k)
-        context, sources = self._build_context(items, max_chars=2000, max_item_chars=600)
+        """
+        知识库检索（支持向量搜索 + 关键词搜索）
+        """
+        import os
+        
+        # 相似度阈值
+        MIN_SIMILARITY = 0.45
+        
+        # 优先尝试向量搜索
+        vector_items = []
+        vector_enabled = os.getenv("VECTOR_SEARCH_ENABLED", "true").lower() == "true"
+        
+        if vector_enabled:
+            try:
+                vector_items = await self.law_service.vector_search_for_rag(query, top_k=top_k)
+                # 过滤低相似度结果
+                if vector_items:
+                    original_count = len(vector_items)
+                    vector_items = [r for r in vector_items if r.get("similarity", 0) >= MIN_SIMILARITY]
+                    if original_count > len(vector_items):
+                        print(f"[KnowledgeBase] 相似度过滤: {original_count} -> {len(vector_items)} (阈值: {MIN_SIMILARITY})")
+                
+                if vector_items:
+                    print(f"[KnowledgeBase] 向量搜索找到 {len(vector_items)} 条结果")
+            except Exception as e:
+                print(f"[KnowledgeBase] ⚠️ 向量搜索失败: {e}")
+                vector_items = []
+        
+        # 关键词搜索作为补充
+        keyword_items = await self.law_service.search_for_rag(query, top_k=top_k)
+        print(f"[KnowledgeBase] 关键词搜索找到 {len(keyword_items)} 条结果")
+        
+        # 合并去重
+        items = self._merge_results(vector_items, keyword_items, top_k)
+        print(f"[KnowledgeBase] 合并后共 {len(items)} 条结果")
+        
+        context, sources = self._build_context(items, max_chars=6000, max_item_chars=1500)
         direct_answer = self._build_direct_answer(query, items)
         return {
             "items": items,
@@ -23,6 +58,32 @@ class KnowledgeBaseService:
             "sources": sources,
             "direct_answer": direct_answer,
         }
+    
+    def _merge_results(
+        self,
+        vector_items: List[Dict[str, Any]],
+        keyword_items: List[Dict[str, Any]],
+        top_k: int,
+    ) -> List[Dict[str, Any]]:
+        """合并向量搜索和关键词搜索结果，去重"""
+        seen = set()
+        merged = []
+        
+        # 优先使用向量搜索结果（相关性更高）
+        for item in vector_items:
+            key = (item.get("law_id"), item.get("article_num"), item.get("article_display"))
+            if key not in seen:
+                seen.add(key)
+                merged.append(item)
+        
+        # 补充关键词搜索结果
+        for item in keyword_items:
+            key = (item.get("law_id"), item.get("article_num"), item.get("article_display"))
+            if key not in seen:
+                seen.add(key)
+                merged.append(item)
+        
+        return merged[:top_k]
 
     def _build_context(
         self,
