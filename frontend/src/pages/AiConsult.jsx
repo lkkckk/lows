@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { message } from 'antd';
+import { Link } from 'react-router-dom';
 import { Send, MessageCircle, Bot, User, Sparkles, Trash2, Copy, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { sendAiMessage, submitAiFeedback } from '../services/api';
 import './AiConsult.css';
@@ -39,6 +40,42 @@ const saveMessages = (messages) => {
         console.warn('保存对话记录失败:', e);
     }
 };
+
+/**
+ * 将 AI 回复中的法律引用（如《治安管理处罚法》第七十二条）转为可点击链接
+ * 点击后跳转到全文检索页 /search?q=《xxx》第xx条
+ */
+function LawLinkText({ content }) {
+    if (!content) return null;
+
+    const regex = /《(.+?)》(第[零一二三四五六七八九十百千\d]+条(?:之[一二三四五六七八九十])?)?/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+        if (match.index > lastIndex) {
+            parts.push(content.slice(lastIndex, match.index));
+        }
+
+        const fullMatch = match[0];
+        const url = `/search?q=${encodeURIComponent(fullMatch)}`;
+
+        parts.push(
+            <Link key={match.index} to={url} className="law-link" title="点击查看法条详情">
+                {fullMatch}
+            </Link>
+        );
+
+        lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < content.length) {
+        parts.push(content.slice(lastIndex));
+    }
+
+    return <>{parts}</>;
+}
 
 export default function AiConsult() {
     const [messages, setMessages] = useState(loadMessages);
@@ -137,7 +174,11 @@ export default function AiConsult() {
             const response = await sendAiMessage(trimmedValue, history.slice(0, -1));
 
             // 添加 AI 回复
-            setMessages(prev => [...prev, { role: 'assistant', content: response.reply }]);
+            setMessages(prev => [...prev, {
+                role: 'assistant',
+                content: response.reply,
+                sources: response.sources || []
+            }]);
         } catch (error) {
             console.error('AI 请求失败:', error);
             message.error(error.response?.data?.detail || 'AI 服务暂时不可用，请稍后重试');
@@ -199,7 +240,7 @@ export default function AiConsult() {
                             </div>
                             <div className="message-content">
                                 <div className="message-bubble">
-                                    {msg.content}
+                                    <LawLinkText content={msg.content} />
                                 </div>
                                 <div className="message-actions">
                                     <button

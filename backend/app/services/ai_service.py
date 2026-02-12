@@ -639,7 +639,9 @@ async def execute_lookup_law_article(
     for article in articles:
         content = article.get("content", "")
         result_articles.append({
+            "law_id": article.get("law_id", ""),
             "law_title": law_map.get(article.get("law_id"), ""),
+            "article_num": article.get("article_num", 0),
             "article_display": article.get("article_display", ""),
             "content": content[:MAX_ARTICLE_CONTENT_LEN] if len(content) > MAX_ARTICLE_CONTENT_LEN else content,
         })
@@ -693,7 +695,9 @@ async def _filter_and_format_results(
         article_display = item.get("article_display", "")
         content = item.get("content", "")
         articles.append({
+            "law_id": item.get("law_id", ""),
             "law_title": law_title,
+            "article_num": item.get("article_num", 0),
             "article_display": article_display,
             "content": content[:MAX_ARTICLE_CONTENT_LEN] if len(content) > MAX_ARTICLE_CONTENT_LEN else content,
         })
@@ -996,7 +1000,9 @@ async def chat_with_ai(
                     # 记录来源
                     for article in result.get("articles", []):
                         rag_sources.append({
+                            "law_id": article.get("law_id", ""),
                             "law_title": article.get("law_title", ""),
+                            "article_num": article.get("article_num", 0),
                             "article_display": article.get("article_display", ""),
                         })
                     

@@ -401,3 +401,18 @@
         max-height: calc(100vh - 340px);
     }
 }
+
+/* 法律条文超链接 */
+.law-link {
+    color: #818cf8;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.law-link:hover {
+    color: #a78bfa;
+    text-decoration-style: solid;
+}

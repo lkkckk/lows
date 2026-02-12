@@ -464,6 +464,8 @@ class LawService:
         text = re.sub(r"(的?内容|的?规定|条文|含义|主要内容|具体内容|规定内容)?(是什么|是啥|指什么|什么意思|指啥|怎么规定|怎么说)?[?？。，；：…]*$", "", text)
         text = re.sub(r"[\s\?\uff1f\u3002\uff0c\uff1b\uff1a\u2026]+$", "", text)
         
+        # 先去掉括号及其中的附加信息（如"（2025年修订）"、"(2020修正)"、"（第三次修改）"等）
+        text = re.sub(r'[（(][^）)]*[）)]', '', text)
         # Remove common brackets that might wrap the law name
         text = re.sub(r"[《》<>〈〉（）()\[\]【】]", "", text)
 
@@ -694,10 +696,18 @@ class LawService:
         import time
         start_time = time.time()
 
-        article_num, sub_index = self.parse_article_input(query)
+        # 预清洗查询：去掉括号中的年份/修订信息（如"（2025年修订）"）
+        clean_query = re.sub(r'[（(][^）)]*(?:\d{2,4}|修订|修正|修改|通过|施行|发布|颁布)[^）)]*[）)]', '', query).strip()
+        # 去掉书名号
+        clean_query = re.sub(r'[《》]', '', clean_query).strip()
+        # 如果清洗后为空，使用原查询
+        if not clean_query:
+            clean_query = query
+
+        article_num, sub_index = self.parse_article_input(clean_query)
         if article_num:
             # 当用户明确搜索特定条号时（如"刑法第112条"），优先使用精准搜索
-            article_result = await self._search_by_law_article(query, article_num, page, page_size, sub_index)
+            article_result = await self._search_by_law_article(clean_query, article_num, page, page_size, sub_index)
             if article_result is not None:
                 # 找到法规，返回结果（即使为空，也意味着该条号不存在）
                 return article_result
@@ -725,7 +735,8 @@ class LawService:
                 pass
 
         # 使用正则表达式搜索（确保准确性，任何子字符串都能被找到）
-        search_query = {"content": {"$regex": query, "$options": "i"}}
+        # 对查询进行 escape，防止括号等特殊字符导致正则出错
+        search_query = {"content": {"$regex": re.escape(clean_query), "$options": "i"}}
         total = await self.articles_collection.count_documents(search_query)
         
         # 获取所有匹配结果（用于权重排序）
