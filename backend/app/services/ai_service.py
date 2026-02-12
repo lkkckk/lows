@@ -20,6 +20,14 @@ VECTOR_SIMILARITY_THRESHOLD = 0.35
 # 返回给 LLM 的条文内容最大长度
 MAX_ARTICLE_CONTENT_LEN = 1500
 
+# LLM 请求超时配置（内网部署 + 并发场景，需预留充足等待时间）
+LLM_TIMEOUT = httpx.Timeout(
+    connect=30.0,     # 建立 TCP 连接超时
+    read=180.0,       # 等待 LLM 响应超时（核心：内网并发排队可能很慢）
+    write=30.0,       # 发送请求体超时
+    pool=30.0         # 连接池等待超时
+)
+
 # 系统提示词 - 定义 AI 助手人设（Function Calling 版本）
 SYSTEM_PROMPT = """你是一名公安执法辅助中的【法律适用解释助手】，目标是用简洁、准确的方式回答执法人员关于法律适用的问题。
 
@@ -788,9 +796,9 @@ async def _call_llm(
     messages: List[Dict],
     skip_ssl_verify: bool,
     tools: Optional[List[Dict]] = None,
-    timeout: float = 60.0,
+    timeout: httpx.Timeout = LLM_TIMEOUT,
 ) -> Dict[str, Any]:
-    """调用 LLM API"""
+    """调用 LLM API（内网部署并发场景，默认 read 超时 180 秒）"""
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
