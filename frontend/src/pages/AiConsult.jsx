@@ -89,12 +89,26 @@ export default function AiConsult() {
         saveMessages(messages);
     }, [messages]);
 
-    // 滚动到最新消息
+    // 滚动到最新消息（仅滚动消息区域，不影响整个页面）
+    const isFirstRender = useRef(true);
+    const messagesAreaRef = useRef(null);
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (messagesAreaRef.current) {
+            messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
+        }
     };
 
+    // 页面首次加载时，确保页面从顶部开始
     useEffect(() => {
+        window.scrollTo(0, 0);
+    }, []);
+
+    useEffect(() => {
+        // 首次渲染不自动滚动消息区域
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
         scrollToBottom();
     }, [messages]);
 
@@ -164,7 +178,8 @@ export default function AiConsult() {
                         <h1>AI 法律问答</h1>
                     </div>
                     <p className="ai-hero-subtitle">
-                        请注意！！！AI对法律法规的理解容易出现偏差，引用时请务必进行核对
+                        请注意！！！AI对法律法规的理解可能出现偏差，引用时请务必进行核对。
+                        <br />请给正确的答案给予好评或在回答有误时给予差评,您的反馈对提升AI的准确性非常重要！
                     </p>
                 </div>
             </section>
@@ -172,7 +187,7 @@ export default function AiConsult() {
             {/* 聊天区域 */}
             <div className="chat-container">
                 {/* 消息列表 */}
-                <div className="messages-area">
+                <div className="messages-area" ref={messagesAreaRef}>
                     {messages.map((msg, index) => (
                         <div key={index} className={`message ${msg.role}`}>
                             <div className="message-avatar">
