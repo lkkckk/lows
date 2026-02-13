@@ -1,4 +1,4 @@
-import { Book, Search as SearchIcon, FileText, Sparkles } from 'lucide-react';
+import { Book, Search as SearchIcon, FileText, Sparkles, ClipboardList } from 'lucide-react';
 import LawsList from './pages/LawsList';
 import LawDetail from './pages/LawDetail';
 import GlobalSearch from './pages/GlobalSearch';
@@ -8,6 +8,11 @@ import LawEditor from './pages/LawEditor';
 import Admin from './pages/Admin';
 import AdminLogin from './pages/AdminLogin';
 import AiConsult from './pages/AiConsult';
+import CaseList from './pages/CaseList';
+import CaseCreate from './pages/CaseCreate';
+import CaseDetail from './pages/CaseDetail';
+import TranscriptDetail from './pages/TranscriptDetail';
+import TranscriptSearch from './pages/TranscriptSearch';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 
@@ -20,6 +25,7 @@ const Navbar = () => {
         if (location.pathname.startsWith('/search')) return 'search';
         if (location.pathname.startsWith('/templates')) return 'templates';
         if (location.pathname.startsWith('/ai')) return 'ai';
+        if (location.pathname.startsWith('/cases')) return 'cases';
         return 'laws';
     };
 
@@ -30,7 +36,8 @@ const Navbar = () => {
             'laws': '/laws',
             'search': '/search',
             'templates': '/templates',
-            'ai': '/ai'
+            'ai': '/ai',
+            'cases': '/cases',
         };
         navigate(routes[tab]);
     };
@@ -54,6 +61,7 @@ const Navbar = () => {
                         { id: 'search', label: '全文检索', icon: SearchIcon },
                         { id: 'ai', label: 'AI问法', icon: Sparkles },
                         { id: 'templates', label: '文书模板', icon: FileText },
+                        { id: 'cases', label: '笔录分析', icon: ClipboardList },
                     ].map((item) => (
                         <button
                             key={item.id}
@@ -132,6 +140,11 @@ function App() {
                             <Route path="templates" element={<TemplatesList />} />
                             <Route path="templates/:templateId" element={<TemplateEditor />} />
                             <Route path="ai" element={<AiConsult />} />
+                            <Route path="cases" element={<CaseList />} />
+                            <Route path="cases/create" element={<CaseCreate />} />
+                            <Route path="cases/search" element={<TranscriptSearch />} />
+                            <Route path="cases/:caseId" element={<CaseDetail />} />
+                            <Route path="cases/:caseId/transcripts/:transcriptId" element={<TranscriptDetail />} />
                         </Routes>
                     </MainLayout>
                 } />

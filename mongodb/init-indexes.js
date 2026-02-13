@@ -154,4 +154,70 @@ printjson(db.doc_templates.getIndexes());
 print('\ndoc_instances 集合索引:');
 printjson(db.doc_instances.getIndexes());
 
+// ==================== cases 集合索引 ====================
+print('\n创建 cases 集合索引...');
+
+db.cases.createIndex(
+  { "case_id": 1 },
+  { unique: true, name: "idx_case_id" }
+);
+
+db.cases.createIndex(
+  { "status": 1, "created_at": -1 },
+  { name: "idx_case_status_date" }
+);
+
+db.cases.createIndex(
+  { "case_type": 1 },
+  { name: "idx_case_type" }
+);
+
+db.cases.createIndex(
+  { "case_name": "text", "description": "text", "tags": "text" },
+  { name: "idx_case_text", default_language: "none" }
+);
+
+print('cases 集合索引创建完成');
+
+// ==================== transcripts 集合索引 ====================
+print('创建 transcripts 集合索引...');
+
+db.transcripts.createIndex(
+  { "transcript_id": 1 },
+  { unique: true, name: "idx_transcript_id" }
+);
+
+db.transcripts.createIndex(
+  { "case_id": 1, "created_at": -1 },
+  { name: "idx_transcript_case_date" }
+);
+
+db.transcripts.createIndex(
+  { "analysis_status": 1 },
+  { name: "idx_analysis_status" }
+);
+
+db.transcripts.createIndex(
+  { "type": 1 },
+  { name: "idx_transcript_type" }
+);
+
+db.transcripts.createIndex(
+  { "subject_role": 1 },
+  { name: "idx_subject_role" }
+);
+
+db.transcripts.createIndex(
+  { "content": "text", "keywords": "text" },
+  { name: "idx_transcript_text", default_language: "none" }
+);
+
+print('transcripts 集合索引创建完成');
+
+print('\ncases 集合索引:');
+printjson(db.cases.getIndexes());
+
+print('\ntranscripts 集合索引:');
+printjson(db.transcripts.getIndexes());
+
 print('\n所有索引创建完成！');

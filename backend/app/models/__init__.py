@@ -14,6 +14,12 @@ from .schemas import (
     SearchRequest,
     SearchResultItem,
     LawCreate,
+    CaseCreate,
+    CaseUpdate,
+    CaseListItem,
+    TranscriptCreate,
+    TranscriptAnalysis,
+    TranscriptListItem,
 )
 
 __all__ = [
@@ -29,4 +35,10 @@ __all__ = [
     "SearchRequest",
     "SearchResultItem",
     "LawCreate",
+    "CaseCreate",
+    "CaseUpdate",
+    "CaseListItem",
+    "TranscriptCreate",
+    "TranscriptAnalysis",
+    "TranscriptListItem",
 ]

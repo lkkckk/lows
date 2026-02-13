@@ -1,0 +1,1361 @@
+/* ==================== 笔录详情页样式 ==================== */
+
+/* 笔录详情头部 */
+.transcript-detail-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 24px 0 40px;
+    color: white;
+}
+
+.transcript-detail-header .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.transcript-back {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    margin-bottom: 12px;
+}
+
+.transcript-back:hover {
+    color: white;
+}
+
+.transcript-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.transcript-title-row h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.transcript-title-meta {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 6px;
+}
+
+.transcript-header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.transcript-header-actions button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.transcript-header-actions button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 左右分栏 */
+.transcript-split {
+    max-width: 1400px;
+    margin: -24px auto 0;
+    padding: 0 24px 40px;
+    display: flex;
+    gap: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.transcript-left {
+    flex: 55;
+    min-width: 0;
+}
+
+.transcript-right {
+    flex: 45;
+    min-width: 0;
+}
+
+.transcript-panel {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f1f5f9;
+    overflow: hidden;
+}
+
+.transcript-panel-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.transcript-content-body {
+    padding: 20px;
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.8;
+    font-size: 14px;
+    color: #334155;
+}
+
+/* 分析结果右栏 */
+.analysis-body {
+    padding: 16px 20px;
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+}
+
+.analysis-section {
+    margin-bottom: 20px;
+}
+
+.analysis-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f1f5f9;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.analysis-section-title:hover {
+    color: #6366f1;
+}
+
+.analysis-summary {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 14px;
+    line-height: 1.7;
+    color: #334155;
+    border-left: 3px solid #6366f1;
+}
+
+/* 人员卡片 */
+.person-card {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    border: 1px solid #f1f5f9;
+}
+
+.person-name {
+    font-weight: 600;
+    color: #0f172a;
+    margin-right: 8px;
+}
+
+.person-role {
+    font-size: 12px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.person-detail {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 4px;
+}
+
+/* 时间线 */
+.timeline-item {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    position: relative;
+    padding-left: 20px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #6366f1;
+}
+
+.timeline-item::after {
+    content: '';
+    position: absolute;
+    left: 9px;
+    top: 20px;
+    width: 2px;
+    height: calc(100% - 4px);
+    background: #e2e8f0;
+}
+
+.timeline-item:last-child::after {
+    display: none;
+}
+
+.timeline-time {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6366f1;
+    white-space: nowrap;
+    min-width: 60px;
+}
+
+.timeline-event {
+    font-size: 13px;
+    color: #334155;
+    line-height: 1.5;
+}
+
+/* 地点标签 */
+.location-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.location-tag {
+    padding: 6px 12px;
+    background: #f0fdf4;
+    color: #16a34a;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.location-tag .loc-type {
+    font-size: 11px;
+    color: #86efac;
+    margin-left: 4px;
+}
+
+/* 关键事实 */
+.fact-item {
+    padding: 8px 12px;
+    background: #fffbeb;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border-left: 3px solid #f59e0b;
+}
+
+.fact-category {
+    font-size: 12px;
+    color: #d97706;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.fact-desc {
+    font-size: 13px;
+    color: #334155;
+}
+
+.fact-source {
+    font-size: 12px;
+    color: #94a3b8;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* 关联法条 */
+.law-item {
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #f1f5f9;
+}
+
+.law-item-title {
+    font-weight: 600;
+    color: #0f172a;
+    font-size: 14px;
+}
+
+.law-item-title a {
+    color: #6366f1;
+    text-decoration: none;
+}
+
+.law-item-title a:hover {
+    text-decoration: underline;
+}
+
+.law-item-relevance {
+    font-size: 13px;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.law-confidence {
+    display: inline-block;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+
+.confidence-high {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.confidence-medium {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.confidence-low {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+/* 规范性检查 */
+.compliance-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 13px;
+    color: #334155;
+}
+
+.compliance-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.compliance-pass { color: #16a34a; }
+.compliance-warning { color: #f59e0b; }
+.compliance-fail { color: #ef4444; }
+
+/* 分析中状态 */
+.analysis-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+}
+
+.analysis-loading .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #e2e8f0;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.analysis-loading p {
+    font-size: 14px;
+}
+
+/* 分析失败状态 */
+.analysis-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #ef4444;
+}
+
+.analysis-error button {
+    margin-top: 12px;
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid #ef4444;
+    background: white;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+/* 物品金额 */
+.item-amount {
+    padding: 6px 12px;
+    background: #fef2f2;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    color: #334155;
+    border-left: 3px solid #f87171;
+}
+
+/* ==================== 案件详情页笔录卡片 ==================== */
+
+.detail-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    border: 1px solid #f1f5f9;
+}
+
+.detail-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.detail-section-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.detail-section-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.detail-section-actions button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.detail-section-actions button:hover {
+    background: #f8fafc;
+    border-color: #6366f1;
+    color: #6366f1;
+}
+
+.transcript-card {
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    transition: box-shadow 0.15s;
+}
+
+.transcript-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.transcript-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.transcript-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.transcript-card-meta {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+
+.transcript-card-summary {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.transcript-card-laws {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.transcript-law-tag {
+    font-size: 12px;
+    padding: 2px 8px;
+    background: #eff6ff;
+    color: #3b82f6;
+    border-radius: 4px;
+}
+
+.transcript-card-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.transcript-card-actions button {
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 5px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.transcript-card-actions button:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+}
+
+/* 分析状态标签 */
+.status-badge {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.status-pending {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.status-analyzing {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.status-analyzed {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.status-failed {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+/* ==================== 搜索页 ==================== */
+
+.transcript-search-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 32px 0 60px;
+    color: white;
+}
+
+.transcript-search-hero .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.transcript-search-hero h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 16px;
+}
+
+.transcript-search-form {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.transcript-search-form input {
+    flex: 1;
+    min-width: 240px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 14px;
+    outline: none;
+}
+
+.transcript-search-form input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.transcript-search-form input:focus {
+    border-color: #6366f1;
+}
+
+.transcript-search-form button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: #6366f1;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.transcript-search-form button:hover {
+    background: #4f46e5;
+}
+
+.transcript-search-filters {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+.transcript-search-main {
+    max-width: 1200px;
+    margin: -40px auto 0;
+    padding: 0 24px 40px;
+    position: relative;
+    z-index: 1;
+}
+
+.search-result-card {
+    background: white;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f1f5f9;
+}
+
+.search-result-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #0f172a;
+    margin-bottom: 4px;
+}
+
+.search-result-case {
+    font-size: 13px;
+    color: #6366f1;
+    margin-bottom: 6px;
+}
+
+.search-result-snippet {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    background: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+.search-result-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.search-result-footer .result-laws {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.search-result-footer .result-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.search-result-footer button {
+    padding: 4px 12px;
+    font-size: 12px;
+    border-radius: 5px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    cursor: pointer;
+}
+
+.search-result-footer button:hover {
+    color: #6366f1;
+    border-color: #6366f1;
+}
+
+/* ==================== Modal 弹窗 ==================== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 28px;
+    width: 90%;
+    max-width: 640px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 20px;
+    text-align: center;
+    color: #0f172a;
+}
+
+.modal-textarea {
+    width: 100%;
+    min-height: 200px;
+    padding: 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    resize: vertical;
+    outline: none;
+    box-sizing: border-box;
+    line-height: 1.6;
+}
+
+.modal-textarea:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.modal-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 14px;
+    color: #475569;
+}
+
+.modal-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #6366f1;
+}
+
+/* 文件上传区域 */
+.upload-zone {
+    border: 2px dashed #d1d5db;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 16px;
+    color: #64748b;
+}
+
+.upload-zone:hover {
+    border-color: #6366f1;
+    background: #f8fafc;
+}
+
+.upload-zone.dragging {
+    border-color: #6366f1;
+    background: #eef2ff;
+}
+
+.upload-zone p {
+    margin: 8px 0 0;
+    font-size: 13px;
+}
+
+.upload-file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #f0fdf4;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #16a34a;
+}
+
+/* 案件详情页头部信息 */
+.case-detail-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 24px 0 50px;
+    color: white;
+}
+
+.case-detail-hero .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+.case-detail-hero h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 8px 0 6px;
+}
+
+.case-detail-meta {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.case-detail-desc {
+    margin-top: 8px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.75);
+    line-height: 1.5;
+}
+
+.case-detail-tags {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.case-detail-tags span {
+    font-size: 12px;
+    padding: 2px 8px;
+    background: rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+    border-radius: 4px;
+}
+
+.case-detail-main {
+    max-width: 1200px;
+    margin: -30px auto 0;
+    padding: 0 24px 40px;
+    position: relative;
+    z-index: 1;
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+    .transcript-split {
+        flex-direction: column;
+    }
+    .transcript-left,
+    .transcript-right {
+        flex: auto;
+    }
+}
+
+/* ==================== 交叉分析区域样式 ==================== */
+
+.cross-analysis-section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-top: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e2e8f0;
+}
+
+.cross-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.cross-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.cross-section-title svg {
+    color: #6366f1;
+}
+
+.cross-analyze-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cross-analyze-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.cross-analyze-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.cross-status-hint {
+    text-align: center;
+    padding: 30px 20px;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.cross-status-hint svg {
+    margin-bottom: 8px;
+}
+
+.cross-analyzing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    color: #6366f1;
+}
+
+.cross-analyzing .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #e0e7ff;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+}
+
+.cross-analyzing p {
+    color: #64748b;
+    font-size: 14px;
+}
+
+/* 一致性评分仪表盘 */
+.consistency-dashboard {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.score-ring {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+}
+
+.score-ring svg {
+    transform: rotate(-90deg);
+}
+
+.score-ring-bg {
+    fill: none;
+    stroke: #e2e8f0;
+    stroke-width: 8;
+}
+
+.score-ring-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1s ease, stroke 0.3s;
+}
+
+.score-ring-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.score-high { color: #22c55e; }
+.score-medium { color: #f59e0b; }
+.score-low { color: #ef4444; }
+
+.score-ring-fill.ring-high { stroke: #22c55e; }
+.score-ring-fill.ring-medium { stroke: #f59e0b; }
+.score-ring-fill.ring-low { stroke: #ef4444; }
+
+.score-details {
+    flex: 1;
+}
+
+.score-details h4 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 6px;
+}
+
+.score-details p {
+    margin: 0;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+/* 矛盾点列表 */
+.contradictions-list {
+    margin-bottom: 20px;
+}
+
+.contradictions-list h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 12px;
+}
+
+.contradiction-card {
+    padding: 14px 16px;
+    border-radius: 8px;
+    border-left: 4px solid #e2e8f0;
+    margin-bottom: 10px;
+    background: #fafafa;
+    transition: box-shadow 0.2s;
+}
+
+.contradiction-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.contradiction-card.severity-high {
+    border-left-color: #ef4444;
+    background: #fef2f2;
+}
+
+.contradiction-card.severity-medium {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.contradiction-card.severity-low {
+    border-left-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.contradiction-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.severity-tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.severity-tag.tag-high {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.severity-tag.tag-medium {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.severity-tag.tag-low {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+.contradiction-type {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.contradiction-desc {
+    font-size: 14px;
+    color: #334155;
+    line-height: 1.5;
+    margin-bottom: 8px;
+}
+
+.contradiction-sources {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.source-quote {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+}
+
+.source-person {
+    font-weight: 600;
+    color: #6366f1;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.source-text {
+    color: #475569;
+    font-style: italic;
+}
+
+/* 统一时间线 */
+.unified-timeline {
+    margin-bottom: 20px;
+}
+
+.unified-timeline h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 12px;
+}
+
+.timeline-track {
+    position: relative;
+    padding-left: 24px;
+}
+
+.timeline-track::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: #e2e8f0;
+}
+
+.timeline-node {
+    position: relative;
+    padding: 8px 0 16px;
+}
+
+.timeline-dot {
+    position: absolute;
+    left: -20px;
+    top: 12px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px #22c55e;
+}
+
+.timeline-dot.disputed {
+    background: #f59e0b;
+    box-shadow: 0 0 0 2px #f59e0b;
+}
+
+.timeline-time {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6366f1;
+    margin-bottom: 2px;
+}
+
+.timeline-event-text {
+    font-size: 14px;
+    color: #334155;
+    line-height: 1.4;
+}
+
+.timeline-parties {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.party-agreed {
+    font-size: 11px;
+    padding: 1px 6px;
+    background: #dcfce7;
+    color: #166534;
+    border-radius: 3px;
+}
+
+.party-disputed {
+    font-size: 11px;
+    padding: 1px 6px;
+    background: #fef3c7;
+    color: #92400e;
+    border-radius: 3px;
+}
+
+/* 证据链 */
+.evidence-chain {
+    margin-bottom: 20px;
+}
+
+.evidence-chain h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 12px;
+}
+
+.evidence-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.evidence-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.evidence-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+}
+
+.evidence-icon.obtained {
+    background: #dcfce7;
+    color: #22c55e;
+}
+
+.evidence-icon.needed {
+    background: #fef3c7;
+    color: #f59e0b;
+}
+
+.evidence-info {
+    flex: 1;
+}
+
+.evidence-type {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+}
+
+.evidence-desc {
+    font-size: 13px;
+    color: #334155;
+    margin: 2px 0;
+}
+
+.evidence-sources {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.evidence-status-tag {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.evidence-status-tag.obtained {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.evidence-status-tag.needed {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+/* 交叉分析摘要 */
+.cross-summary {
+    padding: 16px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #ede9fe 100%);
+    border-radius: 8px;
+    font-size: 14px;
+    color: #334155;
+    line-height: 1.6;
+    margin-top: 16px;
+}
+
+.cross-summary h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 8px;
+}

@@ -20,6 +20,9 @@ VECTOR_SIMILARITY_THRESHOLD = 0.35
 # 返回给 LLM 的条文内容最大长度
 MAX_ARTICLE_CONTENT_LEN = 1500
 
+# 不支持 Function Calling 的 (api_url, model) 组合缓存（进程内）
+UNSUPPORTED_TOOL_CALLING_MODELS = set()
+
 # LLM 请求超时配置（内网部署 + 并发场景，需预留充足等待时间）
 LLM_TIMEOUT = httpx.Timeout(
     connect=30.0,     # 建立 TCP 连接超时
@@ -819,9 +822,19 @@ async def _call_llm(
         payload["tool_choice"] = "auto"
     
     async with httpx.AsyncClient(timeout=timeout, verify=not skip_ssl_verify) as client:
-        response = await client.post(api_url, headers=headers, json=payload)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = await client.post(api_url, headers=headers, json=payload)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            # 某些 OpenAI 兼容实现不接受 tool_choice 字段：降级重试一次
+            if tools and e.response.status_code == 400 and payload.get("tool_choice") is not None:
+                retry_payload = dict(payload)
+                retry_payload.pop("tool_choice", None)
+                retry_response = await client.post(api_url, headers=headers, json=retry_payload)
+                retry_response.raise_for_status()
+                return retry_response.json()
+            raise
 
 
 def _format_tool_result(result: Dict[str, Any]) -> str:
@@ -900,6 +913,7 @@ async def chat_with_ai(
     provider_id = config.get("provider", "default")
     use_function_calling = config.get("use_function_calling", True)
     top_k = rag_top_k if rag_top_k is not None else config.get("rag_top_k", 6)
+    tool_model_key = (api_url, model)
     
     total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
     rag_sources = []
@@ -924,6 +938,13 @@ async def chat_with_ai(
     
     try:
         if use_rag and use_function_calling and db is not None:
+            # 已知不支持 tools 的模型直接走回退模式，避免每次先触发 400
+            if tool_model_key in UNSUPPORTED_TOOL_CALLING_MODELS:
+                print(f"[AI Service] 模型已标记不支持Function Calling，直接回退: model={model}")
+                return await _fallback_chat(
+                    message, history, db, config, top_k
+                )
+
             # ========== Function Calling 模式 ==========
             print(f"[AI Service] Function Calling 模式启用")
             
@@ -938,8 +959,16 @@ async def chat_with_ai(
                 print(f"[AI Service] LLM 响应: tool_calls={data.get('choices', [{}])[0].get('message', {}).get('tool_calls')}")
             except httpx.HTTPStatusError as e:
                 # 如果 API 不支持 tools 参数或服务端错误，回退到普通模式
-                print(f"[AI Service] HTTP 错误 {e.response.status_code}，回退到普通模式")
+                response_text = ""
+                try:
+                    response_text = (e.response.text or "")[:300]
+                except Exception:
+                    response_text = ""
+                print(f"[AI Service] HTTP 错误 {e.response.status_code}，回退到普通模式。响应摘要: {response_text}")
                 if e.response.status_code in (400, 500, 502, 503):
+                    if e.response.status_code == 400:
+                        UNSUPPORTED_TOOL_CALLING_MODELS.add(tool_model_key)
+                        print(f"[AI Service] 已标记模型不支持Function Calling: model={model}")
                     return await _fallback_chat(
                         message, history, db, config, top_k
                     )

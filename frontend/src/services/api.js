@@ -304,3 +304,131 @@ export const checkInternalDocs = () => {
 export const getInternalDocsList = (page = 1, pageSize = 20) => {
     return apiClient.get(`/laws/internal-docs/list?page=${page}&page_size=${pageSize}`);
 };
+
+// ==================== 案件管理相关 API ====================
+
+/**
+ * 创建案件
+ */
+export const createCase = (data) => {
+    return apiClient.post('/cases/', data);
+};
+
+/**
+ * 获取案件列表
+ */
+export const getCasesList = (params) => {
+    return apiClient.get('/cases/', { params });
+};
+
+/**
+ * 获取案件详情（含笔录摘要）
+ */
+export const getCaseDetail = (caseId) => {
+    return apiClient.get(`/cases/${caseId}`);
+};
+
+/**
+ * 更新案件
+ */
+export const updateCase = (caseId, data) => {
+    return apiClient.put(`/cases/${caseId}`, data);
+};
+
+/**
+ * 归档/取消归档案件
+ */
+export const archiveCase = (caseId, archive = true) => {
+    return apiClient.put(`/cases/${caseId}/archive?archive=${archive}`);
+};
+
+/**
+ * 删除案件
+ */
+export const deleteCase = (caseId) => {
+    return apiClient.delete(`/cases/${caseId}`);
+};
+
+// ==================== 笔录管理相关 API ====================
+
+/**
+ * 添加笔录（文本方式）
+ */
+export const createTranscript = (caseId, data) => {
+    return apiClient.post(`/cases/${caseId}/transcripts`, data);
+};
+
+/**
+ * 上传笔录文件
+ */
+export const uploadTranscript = (caseId, file, meta) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('title', meta.title);
+    formData.append('type', meta.type);
+    formData.append('subject_name', meta.subject_name);
+    formData.append('subject_role', meta.subject_role);
+    formData.append('auto_analyze', String(meta.auto_analyze));
+    // postForm 自动处理 multipart Content-Type 和 boundary
+    return apiClient.postForm(`/cases/${caseId}/transcripts/upload`, formData, {
+        timeout: 60000,
+    });
+};
+
+/**
+ * 获取案件下笔录列表
+ */
+export const getTranscriptList = (caseId) => {
+    return apiClient.get(`/cases/${caseId}/transcripts`);
+};
+
+/**
+ * 获取笔录详情
+ */
+export const getTranscriptDetail = (caseId, transcriptId) => {
+    return apiClient.get(`/cases/${caseId}/transcripts/${transcriptId}`);
+};
+
+/**
+ * 删除笔录
+ */
+export const deleteTranscript = (caseId, transcriptId) => {
+    return apiClient.delete(`/cases/${caseId}/transcripts/${transcriptId}`);
+};
+
+/**
+ * 触发 AI 分析
+ */
+export const triggerAnalysis = (caseId, transcriptId) => {
+    return apiClient.post(`/cases/${caseId}/transcripts/${transcriptId}/analyze`);
+};
+
+/**
+ * 查询分析状态
+ */
+export const getAnalysisStatus = (caseId, transcriptId) => {
+    return apiClient.get(`/cases/${caseId}/transcripts/${transcriptId}/status`);
+};
+
+/**
+ * 全局搜索笔录知识库
+ */
+export const searchTranscripts = (params) => {
+    return apiClient.get('/cases/search-transcripts', { params });
+};
+
+// ==================== 交叉分析相关 API ====================
+
+/**
+ * 触发交叉分析
+ */
+export const triggerCrossAnalysis = (caseId) => {
+    return apiClient.post(`/cases/${caseId}/cross-analyze`);
+};
+
+/**
+ * 获取交叉分析结果
+ */
+export const getCrossAnalysis = (caseId) => {
+    return apiClient.get(`/cases/${caseId}/cross-analysis`);
+};
