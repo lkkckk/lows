@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { ArrowLeft, Plus, Upload, FileText, RefreshCw, Trash2, Eye, Clock, CheckCircle, AlertCircle, Loader, GitCompareArrows, AlertTriangle, Activity, Package, FileSearch } from 'lucide-react';
-import { getCaseDetail, createTranscript, uploadTranscript, triggerAnalysis, deleteTranscript, getAnalysisStatus, triggerCrossAnalysis, getCrossAnalysis } from '../services/api';
+import { ArrowLeft, Plus, Upload, FileText, RefreshCw, Trash2, Eye, Clock, CheckCircle, AlertCircle, Loader, GitCompareArrows, AlertTriangle, Activity, Package, FileSearch, Edit3 } from 'lucide-react';
+import { getCaseDetail, createTranscript, uploadTranscript, triggerAnalysis, deleteTranscript, getAnalysisStatus, triggerCrossAnalysis, getCrossAnalysis, updateCase, deleteCase } from '../services/api';
 import '../styles/Transcript.css';
 
 export default function CaseDetail() {
@@ -12,6 +12,7 @@ export default function CaseDetail() {
     const [loading, setLoading] = useState(true);
     const [showTextModal, setShowTextModal] = useState(false);
     const [showUploadModal, setShowUploadModal] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
     const [crossAnalysis, setCrossAnalysis] = useState(null);
     const [crossLoading, setCrossLoading] = useState(false);
     const pollingRef = useRef(null);
@@ -104,6 +105,17 @@ export default function CaseDetail() {
         }
     };
 
+    const handleDeleteCase = async () => {
+        if (!window.confirm('确定删除该案件及所有关联笔录？此操作不可撤销。')) return;
+        try {
+            await deleteCase(caseId);
+            message.success('案件已删除');
+            navigate('/cases');
+        } catch (err) {
+            message.error(err?.response?.data?.detail || '删除案件失败');
+        }
+    };
+
     const handleReanalyze = async (e, transcriptId) => {
         e.stopPropagation();
         try {
@@ -156,7 +168,17 @@ export default function CaseDetail() {
                     <button className="transcript-back" onClick={() => navigate('/cases')}>
                         <ArrowLeft size={16} /> 返回案件列表
                     </button>
-                    <h1>{caseData.case_name}</h1>
+                    <div className="case-detail-title-row">
+                        <h1>{caseData.case_name}</h1>
+                        <div className="case-detail-title-actions">
+                            <button className="btn-icon" title="编辑案件" onClick={() => setShowEditModal(true)}>
+                                <Edit3 size={16} />
+                            </button>
+                            <button className="btn-icon btn-danger" title="删除案件" onClick={handleDeleteCase}>
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
+                    </div>
                     <div className="case-detail-meta">
                         {caseData.case_number && <span>编号：{caseData.case_number}</span>}
                         <span>{caseData.case_type}</span>
@@ -251,6 +273,14 @@ export default function CaseDetail() {
             )}
 
             {/* 上传文件 Modal */}
+            {showEditModal && (
+                <EditCaseModal
+                    caseData={caseData}
+                    onClose={() => setShowEditModal(false)}
+                    onSuccess={() => { setShowEditModal(false); fetchDetail(); }}
+                />
+            )}
+
             {showUploadModal && (
                 <UploadFileModal
                     caseId={caseId}
@@ -358,6 +388,72 @@ function AddTextModal({ caseId, onClose, onSuccess }) {
 }
 
 
+/* ==================== 编辑案件 Modal 组件 ==================== */
+function EditCaseModal({ caseData, onClose, onSuccess }) {
+    const [form, setForm] = useState({
+        case_name: caseData.case_name || '',
+        case_number: caseData.case_number || '',
+        case_type: caseData.case_type || '治安案件',
+        description: caseData.description || '',
+    });
+    const [submitting, setSubmitting] = useState(false);
+
+    const handleChange = (field, value) => {
+        setForm(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSubmit = async () => {
+        if (!form.case_name.trim()) {
+            message.warning('案件名称不能为空');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const res = await updateCase(caseData.case_id, form);
+            if (res.success) {
+                message.success('案件信息已更新');
+                onSuccess();
+            } else {
+                message.error(res.error || '更新失败');
+            }
+        } catch (err) {
+            message.error(err?.response?.data?.detail || '更新案件失败');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                <h3>编辑案件信息</h3>
+                <div className="modal-form">
+                    <label>案件名称 *</label>
+                    <input value={form.case_name} onChange={e => handleChange('case_name', e.target.value)} placeholder="请输入案件名称" />
+                    <label>案件编号</label>
+                    <input value={form.case_number} onChange={e => handleChange('case_number', e.target.value)} placeholder="选填" />
+                    <label>案件类型</label>
+                    <select value={form.case_type} onChange={e => handleChange('case_type', e.target.value)}>
+                        <option value="治安案件">治安案件</option>
+                        <option value="刑事案件">刑事案件</option>
+                        <option value="行政案件">行政案件</option>
+                        <option value="其他">其他</option>
+                    </select>
+                    <label>案件描述</label>
+                    <textarea value={form.description} onChange={e => handleChange('description', e.target.value)} placeholder="选填" rows={3} />
+                </div>
+                <div className="modal-footer">
+                    <button className="btn-cancel" onClick={onClose}>取消</button>
+                    <button className="btn-primary" onClick={handleSubmit} disabled={submitting}>
+                        {submitting ? '保存中...' : '保存'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+
 /* ==================== 上传文件 Modal 组件 ==================== */
 function UploadFileModal({ caseId, onClose, onSuccess }) {
     const [file, setFile] = useState(null);
@@ -379,8 +475,8 @@ function UploadFileModal({ caseId, onClose, onSuccess }) {
     const handleFile = (f) => {
         if (f) {
             const ext = f.name.rsplit ? '' : f.name.split('.').pop().toLowerCase();
-            if (!['docx', 'txt'].includes(ext)) {
-                message.error('仅支持 .docx 和 .txt 文件');
+            if (!['doc', 'docx', 'txt'].includes(ext)) {
+                message.error('仅支持 .doc、.docx 和 .txt 文件');
                 return;
             }
             if (f.size > 10 * 1024 * 1024) {
@@ -389,7 +485,7 @@ function UploadFileModal({ caseId, onClose, onSuccess }) {
             }
             setFile(f);
             if (!form.title) {
-                handleChange('title', f.name.replace(/\.(docx|txt)$/i, ''));
+                handleChange('title', f.name.replace(/\.(doc|docx|txt)$/i, ''));
             }
         }
     };
@@ -443,8 +539,8 @@ function UploadFileModal({ caseId, onClose, onSuccess }) {
                     >
                         <Upload size={32} />
                         <p>点击或拖拽文件到此处上传</p>
-                        <p>支持 .docx / .txt，最大 10MB</p>
-                        <input ref={fileInputRef} type="file" accept=".docx,.txt" hidden
+                        <p>支持 .doc / .docx / .txt，最大 10MB</p>
+                        <input ref={fileInputRef} type="file" accept=".doc,.docx,.txt" hidden
                             onChange={e => e.target.files[0] && handleFile(e.target.files[0])} />
                     </div>
                 ) : (

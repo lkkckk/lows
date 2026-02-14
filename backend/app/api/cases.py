@@ -165,9 +165,8 @@ async def archive_case(
 async def delete_case(
     case_id: str,
     service: CaseService = Depends(get_case_service),
-    _admin=Depends(verify_admin),
 ):
-    """删除案件（需管理员权限，连带删除所有笔录）"""
+    """删除案件（连带删除所有笔录）"""
     try:
         ok = await service.delete_case(case_id)
         if not ok:
@@ -222,8 +221,8 @@ async def upload_transcript(
     if not file.filename:
         raise HTTPException(status_code=400, detail="未选择文件")
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ("docx", "txt"):
-        raise HTTPException(status_code=400, detail="仅支持 .docx 和 .txt 文件")
+    if ext not in ("doc", "docx", "txt"):
+        raise HTTPException(status_code=400, detail="仅支持 .doc、.docx 和 .txt 文件")
 
     # 校验大小（10MB）
     file_bytes = await file.read()
@@ -234,6 +233,8 @@ async def upload_transcript(
         # 解析文件内容
         if ext == "docx":
             content = TranscriptService.parse_docx(file_bytes)
+        elif ext == "doc":
+            content = TranscriptService.parse_doc(file_bytes)
         else:
             content = TranscriptService.parse_txt(file_bytes)
 

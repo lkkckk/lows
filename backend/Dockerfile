@@ -3,6 +3,7 @@ FROM python:3.11-slim
 # 安装系统依赖（最小化版本，PDF 导出功能可选）
 RUN apt-get update && apt-get install -y \
     libffi-dev \
+    antiword \
     && rm -rf /var/lib/apt/lists/* || true
 
 WORKDIR /app

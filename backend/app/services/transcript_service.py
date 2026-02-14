@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from app.db import COLLECTION_CASES, COLLECTION_TRANSCRIPTS
+from app.db import COLLECTION_CASES, COLLECTION_TRANSCRIPTS, COLLECTION_LAWS, COLLECTION_LAW_ARTICLES
 from app.services.embedding_client import get_embeddings
 
 
@@ -18,6 +18,8 @@ class TranscriptService:
         self.db = db
         self.cases = db[COLLECTION_CASES]
         self.transcripts = db[COLLECTION_TRANSCRIPTS]
+        self.laws = db[COLLECTION_LAWS]
+        self.law_articles = db[COLLECTION_LAW_ARTICLES]
 
     # ==================== CRUD ====================
 
@@ -113,9 +115,20 @@ class TranscriptService:
 
     # ==================== 文件解析 ====================
 
+    # OLE2 魔数：旧版 .doc 二进制格式的文件头
+    _OLE2_MAGIC = b'\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1'
+
+    @staticmethod
+    def _is_ole2(file_bytes: bytes) -> bool:
+        """检测文件是否为 OLE2 格式（旧版 .doc）"""
+        return file_bytes[:8] == TranscriptService._OLE2_MAGIC
+
     @staticmethod
     def parse_docx(file_bytes: bytes) -> str:
-        """解析 DOCX 文件内容"""
+        """解析 DOCX 文件内容；若检测到实际是旧版 .doc 则自动回退"""
+        # 检测伪装的 .doc 文件（扩展名是 .docx 但实际是 OLE2 格式）
+        if TranscriptService._is_ole2(file_bytes):
+            return TranscriptService.parse_doc(file_bytes)
         try:
             from docx import Document
             import io
@@ -125,7 +138,42 @@ class TranscriptService:
         except ImportError:
             raise RuntimeError("python-docx 未安装，无法解析 DOCX 文件")
         except Exception as e:
-            raise RuntimeError(f"DOCX 解析失败: {e}")
+            # 最后兜底：尝试用 antiword 解析
+            try:
+                return TranscriptService.parse_doc(file_bytes)
+            except Exception:
+                raise RuntimeError(f"DOCX 解析失败: {e}")
+
+    @staticmethod
+    def parse_doc(file_bytes: bytes) -> str:
+        """解析 DOC（旧版 Word）文件内容，使用 antiword"""
+        import subprocess
+        import tempfile
+        import os
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".doc", delete=False) as tmp:
+                tmp.write(file_bytes)
+                tmp_path = tmp.name
+            result = subprocess.run(
+                ["antiword", tmp_path],
+                capture_output=True, timeout=30
+            )
+            os.unlink(tmp_path)
+            if result.returncode != 0:
+                stderr = result.stderr.decode("utf-8", errors="replace")
+                raise RuntimeError(f"antiword 解析失败: {stderr}")
+            # antiword 输出可能是 utf-8 或 latin-1
+            text = result.stdout.decode("utf-8", errors="replace")
+            lines = [line for line in text.splitlines() if line.strip()]
+            return "\n".join(lines)
+        except FileNotFoundError:
+            raise RuntimeError("antiword 未安装，无法解析 .doc 文件")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError(".doc 文件解析超时")
+        except RuntimeError:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"DOC 解析失败: {e}")
 
     @staticmethod
     def parse_txt(file_bytes: bytes) -> str:
@@ -164,6 +212,9 @@ class TranscriptService:
 
             # 调用 LLM 分析
             analysis_result = await self._call_llm_analyze(doc)
+
+            # 用项目法条库校验并丰富关联法条
+            analysis_result = await self._enrich_related_laws_from_db(analysis_result)
 
             # 提取关键词（从分析结果中）
             keywords = self._extract_keywords(analysis_result)
@@ -366,6 +417,86 @@ JSON 结构如下：
                 keywords.add(loc["name"])
 
         return list(keywords)
+
+    async def _enrich_related_laws_from_db(self, analysis: dict) -> dict:
+        """
+        用项目法条库校验并丰富 LLM 输出的关联法条。
+        策略：
+        1. 对 LLM 给出的每条法条，先按法律名称模糊匹配 laws 集合
+        2. 若命中法律，再按条号匹配 law_articles 集合获取原文
+        3. 命中的标记 matched=True 并附上数据库中的准确内容
+        4. 未命中的保留 LLM 原始输出，标记 matched=False
+        """
+        raw_laws = analysis.get("related_laws", [])
+        if not raw_laws:
+            return analysis
+
+        enriched = []
+        for item in raw_laws:
+            law_title = item.get("law_title", "").strip()
+            article_display = item.get("article_display", "").strip()
+            if not law_title:
+                enriched.append({**item, "matched": False})
+                continue
+
+            # 清理书名号
+            clean_title = re.sub(r'[《》]', '', law_title).strip()
+
+            # 1) 在 laws 集合中模糊匹配法律名称
+            law_doc = await self.laws.find_one(
+                {"title": {"$regex": re.escape(clean_title), "$options": "i"}},
+                {"_id": 0, "law_id": 1, "title": 1, "category": 1}
+            )
+            if not law_doc:
+                # 尝试去掉"中华人民共和国"前缀再匹配
+                short_title = re.sub(r'^中华人民共和国', '', clean_title)
+                if short_title != clean_title:
+                    law_doc = await self.laws.find_one(
+                        {"title": {"$regex": re.escape(short_title), "$options": "i"}},
+                        {"_id": 0, "law_id": 1, "title": 1, "category": 1}
+                    )
+                # 或者数据库中存的是全称，LLM 给的是简称
+                if not law_doc:
+                    law_doc = await self.laws.find_one(
+                        {"title": {"$regex": re.escape(clean_title)}},
+                        {"_id": 0, "law_id": 1, "title": 1, "category": 1}
+                    )
+
+            if not law_doc:
+                enriched.append({**item, "matched": False})
+                continue
+
+            # 2) 匹配具体条文
+            enriched_item = {
+                **item,
+                "matched": True,
+                "law_id": law_doc["law_id"],
+                "law_title": law_doc["title"],  # 用数据库中的准确名称
+                "category": law_doc.get("category", ""),
+            }
+
+            if article_display:
+                # 从 article_display 中提取条号用于匹配
+                # 如 "第二百六十四条" → 直接用 article_display 匹配
+                article_doc = await self.law_articles.find_one(
+                    {
+                        "law_id": law_doc["law_id"],
+                        "article_display": {"$regex": re.escape(article_display)},
+                    },
+                    {"_id": 0, "article_num": 1, "article_display": 1, "content": 1}
+                )
+                if article_doc:
+                    enriched_item["article_display"] = article_doc["article_display"]
+                    enriched_item["article_content"] = article_doc["content"]
+                    enriched_item["article_num"] = article_doc.get("article_num")
+
+            enriched.append(enriched_item)
+
+        analysis["related_laws"] = enriched
+        # 统计匹配率
+        matched_count = sum(1 for e in enriched if e.get("matched"))
+        print(f"[TranscriptService] 关联法条检索: {matched_count}/{len(enriched)} 条命中项目法条库")
+        return analysis
 
     # ==================== 交叉分析（二期） ====================
 

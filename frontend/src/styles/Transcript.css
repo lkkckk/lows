@@ -319,6 +319,52 @@
     margin-top: 2px;
 }
 
+.law-item-content {
+    font-size: 13px;
+    color: #334155;
+    background: #f8fafc;
+    border-left: 3px solid #6366f1;
+    padding: 8px 12px;
+    margin-top: 6px;
+    border-radius: 0 6px 6px 0;
+    line-height: 1.7;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.law-matched {
+    border-left: 3px solid #22c55e;
+    padding-left: 10px;
+}
+
+.law-unmatched {
+    border-left: 3px solid #f59e0b;
+    padding-left: 10px;
+    opacity: 0.85;
+}
+
+.law-db-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #dcfce7;
+    color: #16a34a;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
+.law-ai-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #fef3c7;
+    color: #d97706;
+    margin-left: 6px;
+    font-weight: 500;
+}
+
 .law-confidence {
     display: inline-block;
     font-size: 11px;
@@ -747,6 +793,80 @@
     margin: 0 0 20px;
     text-align: center;
     color: #0f172a;
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.modal-form label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #334155;
+}
+.modal-form input,
+.modal-form select,
+.modal-form textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    background: #fff;
+    color: #1e293b;
+    transition: border-color 0.15s;
+}
+.modal-form input:focus,
+.modal-form select:focus,
+.modal-form textarea:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+.modal-form textarea {
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #f1f5f9;
+}
+.modal-footer .btn-cancel {
+    padding: 8px 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #64748b;
+    font-size: 14px;
+    cursor: pointer;
+}
+.modal-footer .btn-cancel:hover {
+    background: #f8fafc;
+    color: #334155;
+}
+.modal-footer .btn-primary {
+    padding: 8px 24px;
+    border: none;
+    border-radius: 8px;
+    background: #6366f1;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+.modal-footer .btn-primary:hover {
+    background: #4f46e5;
+}
+.modal-footer .btn-primary:disabled {
+    background: #a5b4fc;
+    cursor: not-allowed;
 }
 
 .modal-textarea {

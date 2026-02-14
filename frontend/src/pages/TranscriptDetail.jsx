@@ -224,7 +224,7 @@ function AnalysisContent({ analysis }) {
                             ? `《${l.law_title}》${l.article_display}`
                             : l.law_title || '';
                         return (
-                            <div key={i} className="law-item">
+                            <div key={i} className={`law-item ${l.matched ? 'law-matched' : 'law-unmatched'}`}>
                                 <div className="law-item-title">
                                     {linkQuery ? (
                                         <Link to={`/search?q=${encodeURIComponent(linkQuery)}`}>
@@ -233,11 +233,16 @@ function AnalysisContent({ analysis }) {
                                     ) : (
                                         <span>（未知法条）</span>
                                     )}
+                                    {l.matched && <span className="law-db-badge">已匹配法条库</span>}
+                                    {l.matched === false && <span className="law-ai-badge">AI 推荐</span>}
                                     <span className={`law-confidence confidence-${l.confidence || 'medium'}`}>
                                         {l.confidence === 'high' ? '高' : l.confidence === 'low' ? '低' : '中'}
                                     </span>
                                 </div>
                                 {l.relevance && <div className="law-item-relevance">{l.relevance}</div>}
+                                {l.article_content && (
+                                    <div className="law-item-content">{l.article_content}</div>
+                                )}
                             </div>
                         );
                     })}

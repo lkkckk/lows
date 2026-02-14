@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
-import { FolderOpen, Plus, Search, Archive, Clock, FileText } from 'lucide-react';
-import { getCasesList, archiveCase } from '../services/api';
+import { FolderOpen, Plus, Search, Archive, Clock, FileText, Trash2 } from 'lucide-react';
+import { getCasesList, archiveCase, deleteCase } from '../services/api';
 import '../styles/Case.css';
 
 export default function CaseList() {
@@ -59,6 +59,18 @@ export default function CaseList() {
             fetchCases();
         } catch {
             message.error('操作失败');
+        }
+    };
+
+    const handleDelete = async (e, caseId) => {
+        e.stopPropagation();
+        if (!window.confirm('确定删除该案件及所有关联笔录？此操作不可撤销。')) return;
+        try {
+            await deleteCase(caseId);
+            message.success('案件已删除');
+            fetchCases();
+        } catch {
+            message.error('删除案件失败');
         }
     };
 
@@ -148,6 +160,9 @@ export default function CaseList() {
                                     </button>
                                     <button onClick={e => handleArchive(e, c.case_id, c.status)}>
                                         <Archive size={13} /> {c.status === 'archived' ? '取消归档' : '归档'}
+                                    </button>
+                                    <button className="btn-danger-text" onClick={e => handleDelete(e, c.case_id)}>
+                                        <Trash2 size={13} /> 删除
                                     </button>
                                 </div>
                             </div>
